@@ -4,6 +4,7 @@ import { Command } from "commander";
 import path from "path";
 import fs from "fs";
 import { scanFiles } from "./utils/file";
+import { analyzeFile } from "./core/analyzer";
 const program = new Command();
 
 // 定义命令
@@ -28,6 +29,10 @@ program
     }
 
     const files = scanFiles(fullPath);
+    for (const file of files) {
+      const analysisResult = analyzeFile(file);
+      console.log(analysisResult);
+    }
     console.log(`files: `, files);
   });
 
