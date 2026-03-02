@@ -20,7 +20,8 @@
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
     "removeComments": true,
-    "preserveConstEnums": true
+    "preserveConstEnums": true,
+    "jsx": "preserve"
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

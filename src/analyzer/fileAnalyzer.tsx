@@ -18,11 +18,7 @@ export function analyzeFile(filePath: string): FileReport {
   let importCount = 0;
   let hasConsoleLog = false;
   function visit(node: ts.Node) {
-    if (ts.isFunctionDeclaration(node)) {
-      functionCount++;
-    }
-    // 箭头函数也需要计入
-    if (ts.isArrowFunction(node)) {
+    if (ts.isMethodDeclaration(node) || ts.isFunctionDeclaration(node) || ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
       functionCount++;
     }
 
@@ -39,6 +35,7 @@ export function analyzeFile(filePath: string): FileReport {
       if (ts.isPropertyAccessExpression(expression)) {
         const { expression: obj, name: method } = expression;
         if (ts.isIdentifier(obj) && obj.text === "console" && method.text === "log") {
+          hasConsoleLog = true;
         }
       }
     }
@@ -49,36 +46,10 @@ export function analyzeFile(filePath: string): FileReport {
   visit(sourceFile);
 
   return {
-    filePath: filePath,
-    functionCount: functionCount,
-    variableCount: variableCount,
-    importCount: importCount,
-    hasConsoleLog: hasConsoleLog,
-  };
-}
-
-// 统计analyzeFile 返回的数量
-
-function summarizeAnalysisResults(results: ReturnType<typeof analyzeFile>[]) {
-  let totalFunctions = 0;
-  let totalVariables = 0;
-  let totalImports = 0;
-  let totalConsoleLogs = 0;
-  let totalFiles = 0;
-
-  for (const result of results) {
-    totalFunctions += result.functionCount;
-    totalVariables += result.variableCount;
-    totalImports += result.importCount;
-    totalConsoleLogs += result.hasConsoleLog ? 1 : 0;
-    totalFiles++;
-  }
-
-  return {
-    totalFiles,
-    totalFunctions,
-    totalVariables,
-    totalImports,
-    totalConsoleLogs,
+    filePath,
+    functionCount,
+    variableCount,
+    importCount,
+    hasConsoleLog,
   };
 }

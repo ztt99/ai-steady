@@ -1,12 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
-import path from "path";
-import fs from "fs";
-import { scanFiles } from "./utils/file";
-import { getAllTSFiles } from "./core/astFile";
-import { analyzeFile } from "./core/analyzer";
-// import { analyzeFile } from "./core/analyzer";
+import { analyzeProject } from ".";
 const program = new Command();
 
 // 定义命令
@@ -39,12 +34,7 @@ const program = new Command();
 //   });
 
 program.name("ai-structure2").action(() => {
-  const files = getAllTSFiles();
-
-  for (const file of files) {
-    const analysisResult = analyzeFile(file);
-    // console.log(analysisResult);
-  }
+  console.log(analyzeProject());
 });
 
 // 解析参数

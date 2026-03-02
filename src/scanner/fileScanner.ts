@@ -8,6 +8,7 @@ function getAllTSFiles(dir?: string) {
   const results: string[] = [];
   for (const file of files) {
     const fullPath = path.join(rootPath, file);
+
     if (fs.statSync(fullPath).isDirectory()) {
       // 递归处理子目录
       results.push(...getAllTSFiles(fullPath));
