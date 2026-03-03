@@ -33,9 +33,14 @@ const program = new Command();
 //     console.log(`files: `, files);
 //   });
 
-program.name("ai-structure2").action(() => {
-  console.log(analyzeProject());
-});
+program
+  .name("ai-structure2")
+  .argument("<dir>", "要扫描的目录")
+  .action((dir: string) => {
+    console.log(analyzeProject(dir));
+  });
 
 // 解析参数
 program.parse(process.argv);
+
+var a = 1;

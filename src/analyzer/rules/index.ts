@@ -1,3 +1,5 @@
 import { noConsoleRule } from "./noConsoleRule";
+import { noVarRule } from "./noVarRule";
+import { maxFunctionDepthRule } from "./maxFunctionDepthRule";
 
-export const rules = [noConsoleRule];
+export const rules = [maxFunctionDepthRule];

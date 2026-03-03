@@ -16,7 +16,16 @@ export interface ProjectReport {
   filesWithConsole: string[];
 }
 
+interface RuleContext {
+  sourceFile: ts.SourceFile;
+  report: (message: string, node: ts.Node) => void;
+}
+
 export interface Rule {
   name: string;
-  check(node: ts.Node, sourceFile: ts.SourceFile): string | null;
+  // check(node: ts.Node, sourceFile: ts.SourceFile): string | null;
+  create(context: RuleContext): {
+    enter(node: ts.Node): void;
+    exit(node: ts.Node): void;
+  };
 }

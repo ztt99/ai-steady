@@ -1,7 +1,10 @@
 import ts from "typescript";
+import fs from "fs";
+import path from "path";
+export function printAST(filePath: string) {
+  const fileCode = fs.readFileSync(path.join(process.cwd(), filePath), "utf-8");
 
-export function printAST(fileCode: string) {
-  const sourceFile = ts.createSourceFile("file.ts", fileCode, ts.ScriptTarget.Latest, true);
+  const sourceFile = ts.createSourceFile(path.basename(filePath), fileCode, ts.ScriptTarget.Latest, true);
 
   let str = "";
   function visit(node: ts.Node, depth: number) {
@@ -21,6 +24,4 @@ export function printAST(fileCode: string) {
   return str;
 }
 
-printAST(`function add(a: number, b: number) {
-  return a + b;
-}`);
+printAST("src/note/ast.ts");

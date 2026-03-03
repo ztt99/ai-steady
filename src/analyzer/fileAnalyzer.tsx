@@ -13,6 +13,8 @@ export function analyzeFile(filePath: string): FileReport {
     filePath.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
 
+  const ruleInstances = rules.map((rule) => rule.create({ sourceFile, report: (message, node) => report.push(message) }));
+
   let functionCount = 0;
   let variableCount = 0;
   let importCount = 0;
@@ -20,11 +22,8 @@ export function analyzeFile(filePath: string): FileReport {
   let report: string[] = [];
 
   function visit(node: ts.Node) {
-    rules.forEach((rule) => {
-      const result = rule.check(node, sourceFile);
-      if (result) {
-        report.push(result);
-      }
+    ruleInstances.forEach((rule) => {
+      rule.enter(node);
     });
 
     if (ts.isMethodDeclaration(node) || ts.isFunctionDeclaration(node) || ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
@@ -50,6 +49,10 @@ export function analyzeFile(filePath: string): FileReport {
     }
 
     ts.forEachChild(node, visit);
+
+    ruleInstances.forEach((rule) => {
+      rule.exit(node);
+    });
   }
 
   visit(sourceFile);
