@@ -1,7 +1,7 @@
 import ts, { isVariableDeclaration } from "typescript";
 import fs from "fs";
 import { FileReport } from "../types/report";
-
+import { rules } from "./rules";
 export function analyzeFile(filePath: string): FileReport {
   const fileContent = fs.readFileSync(filePath, "utf-8");
 
@@ -17,7 +17,16 @@ export function analyzeFile(filePath: string): FileReport {
   let variableCount = 0;
   let importCount = 0;
   let hasConsoleLog = false;
+  let report: string[] = [];
+
   function visit(node: ts.Node) {
+    rules.forEach((rule) => {
+      const result = rule.check(node, sourceFile);
+      if (result) {
+        report.push(result);
+      }
+    });
+
     if (ts.isMethodDeclaration(node) || ts.isFunctionDeclaration(node) || ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
       functionCount++;
     }
@@ -44,6 +53,7 @@ export function analyzeFile(filePath: string): FileReport {
   }
 
   visit(sourceFile);
+  console.log(report);
 
   return {
     filePath,
@@ -51,5 +61,6 @@ export function analyzeFile(filePath: string): FileReport {
     variableCount,
     importCount,
     hasConsoleLog,
+    // report,
   };
 }

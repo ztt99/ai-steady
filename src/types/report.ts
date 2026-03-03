@@ -1,3 +1,5 @@
+import ts from "typescript";
+
 export interface FileReport {
   filePath: string;
   functionCount: number;
@@ -12,4 +14,9 @@ export interface ProjectReport {
   totalVariables: number;
   totalImports: number;
   filesWithConsole: string[];
+}
+
+export interface Rule {
+  name: string;
+  check(node: ts.Node, sourceFile: ts.SourceFile): string | null;
 }
