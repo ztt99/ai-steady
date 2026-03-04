@@ -29,3 +29,5 @@ export interface Rule {
     exit(node: ts.Node): void;
   };
 }
+
+export type ScopeType = "global" | "function" | "block";

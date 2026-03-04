@@ -1,10 +1,13 @@
 import ts from "typescript";
+import { ScopeType } from "../../types/report";
 
 class Scope {
+  type: ScopeType;
   parent?: Scope;
   private variables = new Set<string>(); //存变量名是否使用
 
-  constructor(parent?: Scope) {
+  constructor(type: ScopeType, parent?: Scope) {
+    this.type = type;
     this.parent = parent;
   }
 
@@ -21,6 +24,10 @@ class Scope {
     } else {
       return false;
     }
+  }
+
+  isFunctionScope(): boolean {
+    return this.type === "function" || this.type === "global";
   }
 }
 

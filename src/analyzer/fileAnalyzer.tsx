@@ -1,5 +1,6 @@
 import ts from "typescript";
 import fs from "fs";
+import chalk from "chalk";
 import { FileReport } from "../types/report";
 import { rules } from "./rules";
 import { Scope } from "./scope/scope";
@@ -24,7 +25,7 @@ export function analyzeFile(filePath: string): FileReport {
   let hasConsoleLog = false;
   let currentScope: Scope;
 
-  currentScope = new Scope();
+  currentScope = new Scope("global");
 
   currentScope.declare("console");
 
@@ -49,7 +50,7 @@ export function analyzeFile(filePath: string): FileReport {
 
       const previousScope = currentScope;
       // 创建新作用域，并将previousScope作用域传递  push
-      currentScope = new Scope(previousScope);
+      currentScope = new Scope("function", previousScope);
       //  处理参数声明
       node.parameters.forEach((param) => {
         if (ts.isIdentifier(param.name)) {
@@ -67,11 +68,31 @@ export function analyzeFile(filePath: string): FileReport {
       return;
     }
 
+    if (ts.isBlock(node)) {
+      const previousScope = currentScope;
+      currentScope = new Scope("block", previousScope);
+      ts.forEachChild(node, visit);
+      currentScope = previousScope;
+      return;
+    }
+
     if (ts.isVariableDeclaration(node)) {
       variableCount++;
       // 收集声明
       if (ts.isIdentifier(node.name)) {
-        currentScope.declare(node.name.text);
+        const text = node.name.text;
+        const declarationList = node.parent;
+
+        if (getVariableKind(declarationList) === "var") {
+          let scope = currentScope;
+          while (scope.parent && !scope.isFunctionScope()) {
+            scope = scope.parent;
+          }
+          scope.declare(text);
+        } else {
+          // 如果是 let const
+          currentScope.declare(text);
+        }
       }
     }
 
@@ -143,4 +164,16 @@ export function analyzeFile(filePath: string): FileReport {
     hasConsoleLog,
     // report,
   };
+}
+
+function getVariableKind(node: ts.Node) {
+  if (node.flags & ts.NodeFlags.Const) {
+    return "const";
+  }
+
+  if (node.flags & ts.NodeFlags.Let) {
+    return "let";
+  }
+
+  return "var";
 }
