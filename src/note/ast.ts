@@ -12,12 +12,12 @@
 
 // visit(sourceFile);
 
-function a() {
-  function b() {
-    function c() {
-      // ❌ 超过 2 层
-    }
-  }
-}
+// function a() {
+//   function b() {
+//     function c() {
+//       // ❌ 超过 2 层
+//     }
+//   }
+// }
 
-export {};
+// export {};

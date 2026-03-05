@@ -4,7 +4,7 @@ import { ScopeType } from "../../types/report";
 class Scope {
   type: ScopeType;
   parent?: Scope;
-  private variables = new Set<string>(); //存变量名是否使用
+  private variables = new Map<string, "let" | "const" | "var" | undefined>(); //存变量名是否使用
 
   constructor(type: ScopeType, parent?: Scope) {
     this.type = type;
@@ -12,8 +12,9 @@ class Scope {
   }
 
   //声明时
-  declare(name: string) {
-    this.variables.add(name);
+  declare(name: string, kind?: "let" | "const" | "var") {
+    this.variables.set(name, kind);
+    console.log(this.variables, this.type);
   }
   // 使用时
   resolve(name: string): boolean {

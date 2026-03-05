@@ -1,6 +1,5 @@
 import ts from "typescript";
 import fs from "fs";
-import chalk from "chalk";
 import { FileReport } from "../types/report";
 import { rules } from "./rules";
 import { Scope } from "./scope/scope";
@@ -27,6 +26,8 @@ export function analyzeFile(filePath: string): FileReport {
 
   currentScope = new Scope("global");
 
+  // collectHoistedDeclarations(sourceFile, currentScope);
+
   currentScope.declare("console");
 
   function report(node: ts.Node, message: string) {
@@ -47,10 +48,13 @@ export function analyzeFile(filePath: string): FileReport {
       ts.isFunctionExpression(node)
     ) {
       functionCount++;
-
       const previousScope = currentScope;
       // 创建新作用域，并将previousScope作用域传递  push
       currentScope = new Scope("function", previousScope);
+      if (node.body && ts.isBlock(node.body)) {
+        // 箭头函数 body 不是 block, 表达式函数没有 hoisting 需求。
+        collectHoistedDeclarations(node.body, currentScope);
+      }
       //  处理参数声明
       node.parameters.forEach((param) => {
         if (ts.isIdentifier(param.name)) {
@@ -63,12 +67,20 @@ export function analyzeFile(filePath: string): FileReport {
       }
 
       ts.forEachChild(node, visit);
+
       // 恢复作用域 pop
       currentScope = previousScope;
       return;
     }
 
     if (ts.isBlock(node)) {
+      const parent = node.parent;
+
+      if (parent && isFunctionWithBody(parent) && parent.body === node) {
+        ts.forEachChild(node, visit);
+        return;
+      }
+
       const previousScope = currentScope;
       currentScope = new Scope("block", previousScope);
       ts.forEachChild(node, visit);
@@ -91,7 +103,7 @@ export function analyzeFile(filePath: string): FileReport {
           scope.declare(text);
         } else {
           // 如果是 let const
-          currentScope.declare(text);
+          currentScope.declare(text, getVariableKind(declarationList));
         }
       }
     }
@@ -154,7 +166,7 @@ export function analyzeFile(filePath: string): FileReport {
   }
 
   visit(sourceFile);
-  // console.log(report);
+  console.log(currentScope);
 
   return {
     filePath,
@@ -176,4 +188,60 @@ function getVariableKind(node: ts.Node) {
   }
 
   return "var";
+}
+// 处理 函数作用域内的变量提升
+function collectHoistedDeclarations(node: ts.Block | ts.SourceFile, currentScope: Scope) {
+  function walkStatement(node: ts.Node) {
+    // 函数声明 return，因为外部有保存 scope 的地方，这里在保存，会重复
+    // 阻止进入 function 作用域边界，永远递归只在 function 边界 return
+    if (
+      ts.isArrowFunction(node) ||
+      ts.isFunctionExpression(node) ||
+      ts.isClassDeclaration(node) ||
+      ts.isMethodDeclaration(node) ||
+      ts.isFunctionDeclaration(node)
+    ) {
+      return;
+    }
+
+    // var 是变量提升 但是不赋值
+    if (ts.isVariableStatement(node)) {
+      if (getVariableKind(node.declarationList) === "var") {
+        for (let decl of node.declarationList.declarations) {
+          collectBindingNames(decl.name, (name) => {
+            currentScope.declare(name);
+          });
+        }
+      }
+      return;
+    }
+  }
+
+  function collectBindingNames(name: ts.BindingName, cb: (name: string) => void) {
+    if (ts.isIdentifier(name)) {
+      cb(name.text);
+    } else {
+      for (let element of name.elements) {
+        if (ts.isOmittedExpression(element)) continue;
+        collectBindingNames(element.name, cb);
+      }
+    }
+  }
+
+  ts.forEachChild(node, walkStatement);
+}
+
+function isFunctionWithBody(
+  node: ts.Node,
+): node is
+  | ts.FunctionDeclaration
+  | ts.FunctionExpression
+  | ts.ArrowFunction
+  | ts.MethodDeclaration {
+  return (
+    ts.isFunctionDeclaration(node) ||
+    ts.isFunctionExpression(node) ||
+    ts.isArrowFunction(node) ||
+    ts.isMethodDeclaration(node)
+  );
 }
