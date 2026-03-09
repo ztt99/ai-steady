@@ -41,10 +41,11 @@
 // console.log(b); // TDZ
 // let b = 1;
 
-function fn() {
-  console.log(a);
-  var a = 1;
-  console.log(b);
+// function fn() {
+//   console.log(a);
+//   var a = 1;
+//   console.log(b);
 
-  let b = 2;
-}
+//   let b = 2;
+// }
+const fn = function foo() {};

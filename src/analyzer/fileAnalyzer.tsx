@@ -3,6 +3,8 @@ import fs from "fs";
 import { FileReport } from "../types/report";
 import { rules } from "./rules";
 import { Scope } from "./scope/scope";
+import Reference from "./reference/reference";
+import { printScopeTree } from "./scopePrinter";
 export function analyzeFile(filePath: string): FileReport {
   const fileContent = fs.readFileSync(filePath, "utf-8");
 
@@ -26,7 +28,7 @@ export function analyzeFile(filePath: string): FileReport {
 
   currentScope = new Scope("global");
 
-  currentScope.declare("console", "initialized");
+  currentScope.declare("console", "builtin");
 
   collectHoistedDeclarations(sourceFile, currentScope);
 
@@ -58,11 +60,15 @@ export function analyzeFile(filePath: string): FileReport {
       //  处理参数声明
       node.parameters.forEach((param) => {
         if (ts.isIdentifier(param.name)) {
-          currentScope.declare(param.name.text, "initialized");
+          currentScope.declare(param.name.text, "param");
         }
       });
       if (ts.isFunctionDeclaration(node) && node.name) {
-        previousScope.declare(node.name.text, "initialized");
+        previousScope.declare(node.name.text, "function");
+      }
+
+      if (ts.isFunctionExpression(node) && node.name) {
+        currentScope.declare(node.name.text, "function");
       }
 
       ts.forEachChild(node, visit);
@@ -100,10 +106,13 @@ export function analyzeFile(filePath: string): FileReport {
           while (scope.parent && !scope.isFunctionScope()) {
             scope = scope.parent;
           }
-          scope.declare(text, "initialized");
+
+          const bindings = scope.resolve(text);
+          bindings?.initialize();
         } else {
           // 如果是 let const
-          currentScope.declare(text, "initialized");
+          const bindings = currentScope.resolve(text);
+          bindings?.initialize();
         }
       }
     }
@@ -130,6 +139,10 @@ export function analyzeFile(filePath: string): FileReport {
       if (ts.isPropertyAccessExpression(node.parent) && node.parent.name === node) {
         return;
       }
+      // import fs from 'fs
+      if (ts.isImportClause(node.parent) && node.parent.name === node) {
+        return;
+      }
       // console.log(node);
 
       /**
@@ -139,14 +152,19 @@ export function analyzeFile(filePath: string): FileReport {
        */
 
       const name = node.text;
-      if (!currentScope.resolve(name)) {
+
+      const binding = currentScope.resolve(name);
+
+      binding?.references.push(new Reference(name, node, currentScope, binding));
+      console.log(binding?.references.length, currentScope.type);
+      if (!binding) {
         report(node, `${name} is not defined`);
       }
-      if (currentScope.resolve(name) === "hoisted") {
+      if (binding?.state === "hoisted") {
         report(node, `${name} is undefined`);
       }
 
-      if (currentScope.resolve(name) === "uninitialized") {
+      if (binding?.state === "uninitialized") {
         report(node, `${name} is TDZ`);
       }
     }
@@ -173,6 +191,7 @@ export function analyzeFile(filePath: string): FileReport {
   }
 
   visit(sourceFile);
+  // printScopeTree(currentScope, sourceFile);
 
   return {
     filePath,
@@ -198,9 +217,11 @@ function getVariableKind(node: ts.Node) {
 // 处理 函数作用域内的变量提升
 function collectHoistedDeclarations(node: ts.Block | ts.SourceFile, currentScope: Scope) {
   function walkStatement(node: ts.Node) {
-    if (currentScope.type === "global" && ts.isFunctionDeclaration(node) && node.name) {
-      currentScope.declare(node.name.text, "initialized");
-      return;
+    if (currentScope.type === "global") {
+      if (ts.isFunctionDeclaration(node) && node.name) {
+        currentScope.declare(node.name.text, "function");
+        return;
+      }
     }
     // 函数声明 return，因为外部有保存 scope 的地方，这里在保存，会重复
     // 阻止进入 function 作用域边界，永远递归只在 function 边界 return
@@ -214,19 +235,42 @@ function collectHoistedDeclarations(node: ts.Block | ts.SourceFile, currentScope
       return;
     }
 
+    if (ts.isImportDeclaration(node)) {
+      const clause = node.importClause;
+
+      if (!clause) return;
+
+      // default import
+      if (clause.name) {
+        currentScope.declare(clause.name.text, "import");
+      }
+      // named imports
+      if (clause.namedBindings) {
+        if (ts.isNamedImports(clause.namedBindings)) {
+          for (const element of clause.namedBindings.elements) {
+            currentScope.declare(element.name.text, "import");
+          }
+        }
+
+        if (ts.isNamespaceImport(clause.namedBindings)) {
+          currentScope.declare(clause.namedBindings.name.text, "import");
+        }
+      }
+      return;
+    }
     // var 是变量提升 但是不赋值
     if (ts.isVariableStatement(node)) {
       if (getVariableKind(node.declarationList) === "var") {
         for (let decl of node.declarationList.declarations) {
           collectBindingNames(decl.name, (name) => {
-            currentScope.declare(name, "hoisted");
+            currentScope.declare(name, "var");
           });
         }
       } else {
         // let const
         for (let decl of node.declarationList.declarations) {
           collectBindingNames(decl.name, (name) => {
-            currentScope.declare(name, "uninitialized");
+            currentScope.declare(name, getVariableKind(node.declarationList));
           });
         }
       }

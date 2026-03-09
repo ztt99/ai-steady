@@ -1,24 +1,35 @@
 import ts from "typescript";
 import { ScopeType, VarState } from "../../types/report";
+import { Binding } from "../binding/Binding";
+import { BindKind } from "../../types/binding";
 
 class Scope {
   type: ScopeType;
   parent?: Scope;
-  private variables = new Map<string, VarState>(); //存变量名是否使用
+  children?: Scope[];
+  private bindings = new Map<string, Binding>(); //存变量名是否使用
 
   constructor(type: ScopeType, parent?: Scope) {
     this.type = type;
     this.parent = parent;
+    this.children = [];
+
+    if (this.parent) {
+      this.parent.children?.push(this);
+    }
   }
 
   //声明时
-  declare(name: string, kind: VarState) {
-    this.variables.set(name, kind);
+  declare(name: string, kind: BindKind) {
+    const binding = new Binding(name, kind, this, []);
+    binding.createState(kind);
+    this.bindings.set(name, binding);
+    return binding;
   }
   // 使用时
-  resolve(name: string): VarState | undefined {
-    if (this.variables.has(name)) {
-      return this.variables.get(name);
+  resolve(name: string): Binding | undefined {
+    if (this.bindings.has(name)) {
+      return this.bindings.get(name);
     }
     return this.parent?.resolve(name);
   }
