@@ -31,3 +31,5 @@ export interface Rule {
 }
 
 export type ScopeType = "global" | "function" | "block";
+
+export type VarState = "hoisted" | "uninitialized" | "initialized";
