@@ -1,3 +1,4 @@
+import ts from "typescript";
 import { BindKind } from "../../types/binding";
 import { VarState } from "../../types/report";
 import Reference from "../reference/reference";
@@ -9,6 +10,8 @@ class Binding {
   scope: Scope;
   references: Reference[];
   state: VarState;
+  identifier?: ts.Node;
+
   constructor(name: string, kind: BindKind, scope: Scope, references: Reference[]) {
     this.name = name;
     this.kind = kind;

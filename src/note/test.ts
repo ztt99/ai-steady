@@ -47,5 +47,9 @@
 //   console.log(b);
 
 //   let b = 2;
+// const a = 1;
+// let b = 2;
+// function foo(x, y) {
+//   console.log(x);
 // }
-const fn = function foo() {};
+import { readFile } from "fs";

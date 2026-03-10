@@ -1,4 +1,6 @@
 import ts from "typescript";
+import { Binding } from "../analyzer/binding/Binding";
+import { Scope } from "../analyzer/scope/scope";
 
 export interface FileReport {
   filePath: string;
@@ -6,6 +8,7 @@ export interface FileReport {
   variableCount: number;
   importCount: number;
   hasConsoleLog: boolean;
+  walkReport: UnusedReport[];
 }
 
 export interface ProjectReport {
@@ -33,3 +36,11 @@ export interface Rule {
 export type ScopeType = "global" | "function" | "block";
 
 export type VarState = "hoisted" | "uninitialized" | "initialized";
+
+export interface UnusedReport {
+  name: string;
+  kind: Binding["kind"];
+  line: number;
+  column: number;
+  scopeType: Scope["type"];
+}

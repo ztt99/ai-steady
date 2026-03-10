@@ -5,6 +5,7 @@ import { rules } from "./rules";
 import { Scope } from "./scope/scope";
 import Reference from "./reference/reference";
 import { printScopeTree } from "./scopePrinter";
+import { UnusedReport } from "./report/UnusedReport";
 export function analyzeFile(filePath: string): FileReport {
   const fileContent = fs.readFileSync(filePath, "utf-8");
 
@@ -60,15 +61,15 @@ export function analyzeFile(filePath: string): FileReport {
       //  处理参数声明
       node.parameters.forEach((param) => {
         if (ts.isIdentifier(param.name)) {
-          currentScope.declare(param.name.text, "param");
+          currentScope.declare(param.name.text, "param", node);
         }
       });
       if (ts.isFunctionDeclaration(node) && node.name) {
-        previousScope.declare(node.name.text, "function");
+        previousScope.declare(node.name.text, "function", node);
       }
 
       if (ts.isFunctionExpression(node) && node.name) {
-        currentScope.declare(node.name.text, "function");
+        currentScope.declare(node.name.text, "function", node);
       }
 
       ts.forEachChild(node, visit);
@@ -139,10 +140,15 @@ export function analyzeFile(filePath: string): FileReport {
       if (ts.isPropertyAccessExpression(node.parent) && node.parent.name === node) {
         return;
       }
-      // import fs from 'fs
+
       if (ts.isImportClause(node.parent) && node.parent.name === node) {
         return;
       }
+
+      if (ts.isImportSpecifier(node.parent) && node.parent.name === node) {
+        return;
+      }
+
       // console.log(node);
 
       /**
@@ -193,13 +199,39 @@ export function analyzeFile(filePath: string): FileReport {
   visit(sourceFile);
   // printScopeTree(currentScope, sourceFile);
 
+  const walkReport: UnusedReport[] = [];
+  function walkScope(currentScope: Scope) {
+    for (let [name, binding] of currentScope.bindings) {
+      if (binding.references.length === 0) {
+        walkReport.push(
+          new UnusedReport(
+            name,
+            binding.kind,
+            binding.identifier?.getStart() ?? 0,
+            binding.identifier?.getEnd() ?? 0,
+            currentScope.type,
+          ),
+        );
+      }
+    }
+    if (currentScope.children) {
+      for (let child of currentScope.children) {
+        walkScope(child);
+      }
+    }
+  }
+
+  walkScope(currentScope);
+
+  console.log(walkReport);
+  printScopeTree(currentScope, sourceFile);
   return {
     filePath,
     functionCount,
     variableCount,
     importCount,
     hasConsoleLog,
-    // report,
+    walkReport,
   };
 }
 
@@ -219,7 +251,7 @@ function collectHoistedDeclarations(node: ts.Block | ts.SourceFile, currentScope
   function walkStatement(node: ts.Node) {
     if (currentScope.type === "global") {
       if (ts.isFunctionDeclaration(node) && node.name) {
-        currentScope.declare(node.name.text, "function");
+        currentScope.declare(node.name.text, "function", node);
         return;
       }
     }
@@ -237,25 +269,26 @@ function collectHoistedDeclarations(node: ts.Block | ts.SourceFile, currentScope
 
     if (ts.isImportDeclaration(node)) {
       const clause = node.importClause;
-
       if (!clause) return;
 
       // default import
       if (clause.name) {
-        currentScope.declare(clause.name.text, "import");
+        currentScope.declare(clause.name.text, "import", node);
       }
       // named imports
       if (clause.namedBindings) {
         if (ts.isNamedImports(clause.namedBindings)) {
           for (const element of clause.namedBindings.elements) {
-            currentScope.declare(element.name.text, "import");
+            currentScope.declare(element.name.text, "import", element);
           }
         }
 
         if (ts.isNamespaceImport(clause.namedBindings)) {
-          currentScope.declare(clause.namedBindings.name.text, "import");
+          currentScope.declare(clause.namedBindings.name.text, "import", node);
         }
       }
+      ts.forEachChild(node, walkStatement);
+
       return;
     }
     // var 是变量提升 但是不赋值
@@ -263,14 +296,14 @@ function collectHoistedDeclarations(node: ts.Block | ts.SourceFile, currentScope
       if (getVariableKind(node.declarationList) === "var") {
         for (let decl of node.declarationList.declarations) {
           collectBindingNames(decl.name, (name) => {
-            currentScope.declare(name, "var");
+            currentScope.declare(name, "var", decl);
           });
         }
       } else {
         // let const
         for (let decl of node.declarationList.declarations) {
           collectBindingNames(decl.name, (name) => {
-            currentScope.declare(name, getVariableKind(node.declarationList));
+            currentScope.declare(name, getVariableKind(node.declarationList), decl);
           });
         }
       }

@@ -7,7 +7,7 @@ class Scope {
   type: ScopeType;
   parent?: Scope;
   children?: Scope[];
-  private bindings = new Map<string, Binding>(); //存变量名是否使用
+  bindings = new Map<string, Binding>(); //存变量名是否使用
 
   constructor(type: ScopeType, parent?: Scope) {
     this.type = type;
@@ -20,9 +20,10 @@ class Scope {
   }
 
   //声明时
-  declare(name: string, kind: BindKind) {
+  declare(name: string, kind: BindKind, node?: ts.Node) {
     const binding = new Binding(name, kind, this, []);
     binding.createState(kind);
+    binding.identifier = node;
     this.bindings.set(name, binding);
     return binding;
   }
