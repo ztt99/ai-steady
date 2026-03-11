@@ -52,12 +52,13 @@
 // function foo(x, y) {
 //   console.log(x);
 // }
-const a = 1;
+const a = b + c;
+const b = d;
+const c = 1;
+const d = 2;
 
-function foo() {
-  let b = 2;
+function fn() {
+  const a = 2;
 
-  {
-    const a = 3; // shadow
-  }
+  let b = a + 1;
 }

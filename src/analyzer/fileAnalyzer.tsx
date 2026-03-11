@@ -7,7 +7,12 @@ import Reference from "./reference/reference";
 import { printScopeTree } from "./scopePrinter";
 import { UnusedReport } from "./report/UnusedReport";
 import { AnalyzerContext } from "./context/analyzerContext";
+import { DependencyGraph } from "./graph/dependencyGraph";
+import { Binding } from "./binding/Binding";
 export function analyzeFile(filePath: string): FileReport {
+  const dependencyGraph = new DependencyGraph();
+  let currentBinding: Binding | undefined;
+
   const fileContent = fs.readFileSync(filePath, "utf-8");
 
   const sourceFile = ts.createSourceFile(
@@ -96,6 +101,7 @@ export function analyzeFile(filePath: string): FileReport {
     // 如果是声明，这时候将变量提升的状态修改
     if (ts.isVariableDeclaration(node)) {
       variableCount++;
+      let previousBinding = currentBinding;
       // 收集声明
       if (ts.isIdentifier(node.name)) {
         const text = node.name.text;
@@ -109,11 +115,20 @@ export function analyzeFile(filePath: string): FileReport {
 
           const bindings = scope.resolve(text);
           bindings?.initialize();
+          currentBinding = bindings;
         } else {
           // 如果是 let const
           const bindings = currentScope.resolve(text);
           bindings?.initialize();
+          currentBinding = bindings;
         }
+
+        if (node.initializer) {
+          visit(node.initializer);
+        }
+
+        currentBinding = previousBinding;
+        return;
       }
     }
 
@@ -166,6 +181,10 @@ export function analyzeFile(filePath: string): FileReport {
 
       if (binding) {
         binding.references.push(ref);
+      }
+
+      if (currentBinding && binding) {
+        dependencyGraph.addDependency(currentBinding, binding);
       }
       if (!binding) {
         report(node, `${name} is not defined`);
@@ -229,7 +248,7 @@ export function analyzeFile(filePath: string): FileReport {
 
   // console.log(walkReport);
   printScopeTree(currentScope, sourceFile);
-
+  dependencyGraph.print();
   return {
     filePath,
     functionCount,
