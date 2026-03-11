@@ -10,7 +10,8 @@ class Binding {
   scope: Scope;
   references: Reference[];
   state: VarState;
-  identifier?: ts.Node;
+  identifier: ts.Node | undefined;
+  shadowed: Binding | undefined;
 
   constructor(name: string, kind: BindKind, scope: Scope, references: Reference[]) {
     this.name = name;

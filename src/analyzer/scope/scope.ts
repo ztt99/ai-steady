@@ -2,6 +2,7 @@ import ts from "typescript";
 import { ScopeType, VarState } from "../../types/report";
 import { Binding } from "../binding/Binding";
 import { BindKind } from "../../types/binding";
+import { checkShadow } from "../report/ShadowDetection";
 
 class Scope {
   type: ScopeType;
@@ -20,11 +21,16 @@ class Scope {
   }
 
   //声明时
-  declare(name: string, kind: BindKind, node?: ts.Node) {
+  declare(name: string, kind: BindKind, node: ts.Node) {
     const binding = new Binding(name, kind, this, []);
+
     binding.createState(kind);
     binding.identifier = node;
     this.bindings.set(name, binding);
+
+    const outerBinding = checkShadow(binding);
+    binding.shadowed = outerBinding;
+
     return binding;
   }
   // 使用时

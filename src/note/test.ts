@@ -52,4 +52,12 @@
 // function foo(x, y) {
 //   console.log(x);
 // }
-import { readFile } from "fs";
+const a = 1;
+
+function foo() {
+  let b = 2;
+
+  {
+    const a = 3; // shadow
+  }
+}
