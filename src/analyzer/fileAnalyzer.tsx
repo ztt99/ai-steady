@@ -6,6 +6,7 @@ import { Scope } from "./scope/scope";
 import Reference from "./reference/reference";
 import { printScopeTree } from "./scopePrinter";
 import { UnusedReport } from "./report/UnusedReport";
+import { AnalyzerContext } from "./context/analyzerContext";
 export function analyzeFile(filePath: string): FileReport {
   const fileContent = fs.readFileSync(filePath, "utf-8");
 
@@ -26,6 +27,7 @@ export function analyzeFile(filePath: string): FileReport {
   let importCount = 0;
   let hasConsoleLog = false;
   let currentScope: Scope;
+  const context = new AnalyzerContext();
 
   currentScope = new Scope("global");
 
@@ -158,8 +160,13 @@ export function analyzeFile(filePath: string): FileReport {
 
       const binding = currentScope.resolve(name);
 
-      binding?.references.push(new Reference(name, node, currentScope, binding));
-      console.log(binding?.references.length, currentScope.type);
+      const ref = new Reference(name, node, currentScope, binding ?? null);
+
+      context.references.push(ref);
+
+      if (binding) {
+        binding.references.push(ref);
+      }
       if (!binding) {
         report(node, `${name} is not defined`);
       }

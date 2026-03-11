@@ -6,13 +6,13 @@ class Reference {
   name: string;
   identifier: ts.Identifier; // AST 节点
   fromScope: Scope;
-  resolvedBinding?: Binding; // 可能未声明
+  resolvedBinding?: Binding | null; // 可能未声明
 
   constructor(
     name: string,
     identifier: ts.Identifier,
     fromScope: Scope,
-    resolvedBinding?: Binding,
+    resolvedBinding?: Binding | null,
   ) {
     this.name = name;
     this.identifier = identifier;
