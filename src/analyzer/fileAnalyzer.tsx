@@ -11,10 +11,12 @@ import { DependencyGraph } from "./graph/dependencyGraph";
 import { Binding } from "./binding/Binding";
 import { ImpactAnalyzer } from "./graph/impactAnalyzer";
 import { CallGraph } from "./graph/callGraph";
+import { SymbolGraph } from "./symbol/symbolGraph";
 export function analyzeFile(filePath: string): FileReport {
   const dependencyGraph = new DependencyGraph();
   const callGraph = new CallGraph();
   const impactAnalyzer = new ImpactAnalyzer(dependencyGraph);
+  const symbolGraph = new SymbolGraph();
   let currentBinding: Binding | undefined;
   let currentFunctionBinding: Binding | undefined;
 
@@ -205,7 +207,8 @@ export function analyzeFile(filePath: string): FileReport {
       }
 
       if (currentBinding && binding) {
-        dependencyGraph.addDependency(currentBinding, binding);
+        symbolGraph.addEdge(currentBinding, binding, "dependency");
+        // dependencyGraph.addDependency(currentBinding, binding);
       }
       if (!binding) {
         report(node, `${name} is not defined`);
@@ -232,7 +235,8 @@ export function analyzeFile(filePath: string): FileReport {
 
         // 函数执行的时候，能都获取到当前函数名
         if (currentFunctionBinding && callee) {
-          callGraph.addCall(currentFunctionBinding, callee);
+          symbolGraph.addEdge(currentFunctionBinding, callee, "call");
+          // callGraph.addCall(currentFunctionBinding, callee);
         }
       }
       // if (ts.isPropertyAccessExpression(expression)) {
@@ -280,9 +284,10 @@ export function analyzeFile(filePath: string): FileReport {
   // console.log(walkReport);
   printScopeTree(currentScope, sourceFile);
 
-  dependencyGraph.print();
+  // dependencyGraph.print();
 
-  callGraph.print();
+  // callGraph.print();
+  symbolGraph.print();
 
   // 测试使用
   // for (const [name, binding] of currentScope.bindings) {
