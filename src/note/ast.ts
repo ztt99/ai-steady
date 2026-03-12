@@ -21,3 +21,10 @@
 // }
 
 // export {};
+
+const a = b + c;
+const b = d;
+const c = 1;
+const d = 2;
+
+export {};

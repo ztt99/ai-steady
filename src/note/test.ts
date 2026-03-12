@@ -56,9 +56,3 @@ const a = b + c;
 const b = d;
 const c = 1;
 const d = 2;
-
-function fn() {
-  const a = 2;
-
-  let b = a + 1;
-}

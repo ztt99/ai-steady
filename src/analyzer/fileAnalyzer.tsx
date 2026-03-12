@@ -9,8 +9,10 @@ import { UnusedReport } from "./report/UnusedReport";
 import { AnalyzerContext } from "./context/analyzerContext";
 import { DependencyGraph } from "./graph/dependencyGraph";
 import { Binding } from "./binding/Binding";
+import { ImpactAnalyzer } from "./graph/impactAnalyzer";
 export function analyzeFile(filePath: string): FileReport {
   const dependencyGraph = new DependencyGraph();
+  const impactAnalyzer = new ImpactAnalyzer(dependencyGraph);
   let currentBinding: Binding | undefined;
 
   const fileContent = fs.readFileSync(filePath, "utf-8");
@@ -248,7 +250,19 @@ export function analyzeFile(filePath: string): FileReport {
 
   // console.log(walkReport);
   printScopeTree(currentScope, sourceFile);
+
   dependencyGraph.print();
+
+  for (const [name, binding] of currentScope.bindings) {
+    if (name === "d") {
+      const impacted = impactAnalyzer.getImpactedBindings(binding);
+
+      console.log(
+        "Impact of d:",
+        [...impacted].map((b) => b.name),
+      );
+    }
+  }
   return {
     filePath,
     functionCount,
