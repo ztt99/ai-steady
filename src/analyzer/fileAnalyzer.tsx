@@ -168,6 +168,10 @@ export function analyzeFile(filePath: string): FileReport {
         return;
       }
       // 如果是属性访问
+
+      if (ts.isPropertyAssignment(node.parent) && node.parent.name === node) {
+        return;
+      }
       if (ts.isPropertyAccessExpression(node.parent) && node.parent.name === node) {
         return;
       }
@@ -220,6 +224,7 @@ export function analyzeFile(filePath: string): FileReport {
     }
 
     if (ts.isCallExpression(node)) {
+      // obj.fn() 这种没有做 主线为主!!!
       const expression = node.expression;
 
       if (ts.isIdentifier(expression)) {
@@ -299,6 +304,14 @@ export function analyzeFile(filePath: string): FileReport {
     hasConsoleLog,
     walkReport,
   };
+}
+
+function handlePropertyAccessExpression(expression: ts.Expression) {
+  if (ts.isPropertyAccessExpression(expression)) {
+    const { expression: obj, name: method } = expression;
+    if (ts.isIdentifier(method)) {
+    }
+  }
 }
 
 // 处理 函数作用域内的变量提升

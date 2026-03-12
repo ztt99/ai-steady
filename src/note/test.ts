@@ -1,9 +1,5 @@
-const fn = function () {
-  return 1;
+const obj = {
+  fn: () => {},
 };
 
-function fn2() {
-  fn();
-}
-
-fn2();
+obj.fn();
