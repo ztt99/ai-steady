@@ -4,7 +4,12 @@ import path from "path";
 export function printAST(filePath: string) {
   const fileCode = fs.readFileSync(path.join(process.cwd(), filePath), "utf-8");
 
-  const sourceFile = ts.createSourceFile(path.basename(filePath), fileCode, ts.ScriptTarget.Latest, true);
+  const sourceFile = ts.createSourceFile(
+    path.basename(filePath),
+    fileCode,
+    ts.ScriptTarget.Latest,
+    true,
+  );
 
   let str = "";
   function visit(node: ts.Node, depth: number) {
@@ -24,4 +29,4 @@ export function printAST(filePath: string) {
   return str;
 }
 
-printAST("src/note/ast.ts");
+printAST("src/note/test.ts");

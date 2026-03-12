@@ -10,10 +10,13 @@ import { AnalyzerContext } from "./context/analyzerContext";
 import { DependencyGraph } from "./graph/dependencyGraph";
 import { Binding } from "./binding/Binding";
 import { ImpactAnalyzer } from "./graph/impactAnalyzer";
+import { CallGraph } from "./graph/callGraph";
 export function analyzeFile(filePath: string): FileReport {
   const dependencyGraph = new DependencyGraph();
+  const callGraph = new CallGraph();
   const impactAnalyzer = new ImpactAnalyzer(dependencyGraph);
   let currentBinding: Binding | undefined;
+  let currentFunctionBinding: Binding | undefined;
 
   const fileContent = fs.readFileSync(filePath, "utf-8");
 
@@ -40,6 +43,7 @@ export function analyzeFile(filePath: string): FileReport {
 
   currentScope.declare("console", "builtin", sourceFile);
 
+  // 收集全局作用域中的变量
   collectHoistedDeclarations(sourceFile, currentScope);
 
   function report(node: ts.Node, message: string) {
@@ -59,6 +63,7 @@ export function analyzeFile(filePath: string): FileReport {
       ts.isArrowFunction(node) ||
       ts.isFunctionExpression(node)
     ) {
+      const previousFunctionBinding = currentFunctionBinding;
       functionCount++;
       const previousScope = currentScope;
       // 创建新作用域，并将previousScope作用域传递  push
@@ -73,14 +78,24 @@ export function analyzeFile(filePath: string): FileReport {
           currentScope.declare(param.name.text, "param", param);
         }
       });
+
+      // cosnt fn = function (){}  如果表达式的函数有名字，那么收集变量提升，在此函数内部可以使用这个名字，如果没有名字不保存
       if (ts.isFunctionExpression(node) && node.name) {
         currentScope.declare(node.name.text, "function", node);
+      }
+
+      if (node.name && ts.isIdentifier(node.name)) {
+        const binding = currentScope.resolve(node.name.text);
+        if (binding) {
+          currentFunctionBinding = binding;
+        }
       }
 
       ts.forEachChild(node, visit);
 
       // 恢复作用域 pop
       currentScope = previousScope;
+      currentFunctionBinding = previousFunctionBinding;
       return;
     }
 
@@ -206,12 +221,21 @@ export function analyzeFile(filePath: string): FileReport {
 
     if (ts.isCallExpression(node)) {
       const expression = node.expression;
-      if (ts.isPropertyAccessExpression(expression)) {
-        const { expression: obj, name: method } = expression;
-        if (ts.isIdentifier(obj) && obj.text === "console" && method.text === "log") {
-          hasConsoleLog = true;
+
+      if (ts.isIdentifier(expression)) {
+        const callee = currentScope.resolve(expression.text);
+
+        // 函数执行的时候，能都获取到当前函数名
+        if (currentFunctionBinding && callee) {
+          callGraph.addCall(currentFunctionBinding, callee);
         }
       }
+      // if (ts.isPropertyAccessExpression(expression)) {
+      //   const { expression: obj, name: method } = expression;
+      //   if (ts.isIdentifier(obj) && obj.text === "console" && method.text === "log") {
+      //     hasConsoleLog = true;
+      //   }
+      // }
     }
 
     ts.forEachChild(node, visit);
@@ -253,16 +277,20 @@ export function analyzeFile(filePath: string): FileReport {
 
   dependencyGraph.print();
 
-  for (const [name, binding] of currentScope.bindings) {
-    if (name === "d") {
-      const impacted = impactAnalyzer.getImpactedBindings(binding);
+  callGraph.print();
 
-      console.log(
-        "Impact of d:",
-        [...impacted].map((b) => b.name),
-      );
-    }
-  }
+  // 测试使用
+  // for (const [name, binding] of currentScope.bindings) {
+  //   if (name === "d") {
+  //     const impacted = impactAnalyzer.getImpactedBindings(binding);
+
+  //     console.log(
+  //       "Impact of d:",
+  //       [...impacted].map((b) => b.name),
+  //     );
+  //   }
+  // }
+
   return {
     filePath,
     functionCount,
@@ -273,17 +301,6 @@ export function analyzeFile(filePath: string): FileReport {
   };
 }
 
-function getVariableKind(node: ts.Node) {
-  if (node.flags & ts.NodeFlags.Const) {
-    return "const";
-  }
-
-  if (node.flags & ts.NodeFlags.Let) {
-    return "let";
-  }
-
-  return "var";
-}
 // 处理 函数作用域内的变量提升
 function collectHoistedDeclarations(node: ts.Block | ts.SourceFile, currentScope: Scope) {
   function walkStatement(node: ts.Node) {
@@ -370,6 +387,18 @@ function collectHoistedDeclarations(node: ts.Block | ts.SourceFile, currentScope
   }
 
   ts.forEachChild(node, walkStatement);
+}
+
+function getVariableKind(node: ts.Node) {
+  if (node.flags & ts.NodeFlags.Const) {
+    return "const";
+  }
+
+  if (node.flags & ts.NodeFlags.Let) {
+    return "let";
+  }
+
+  return "var";
 }
 
 function isFunctionWithBody(
