@@ -12,6 +12,11 @@ import { Binding } from "./binding/Binding";
 import { ImpactAnalyzer } from "./graph/impactAnalyzer";
 import { CallGraph } from "./graph/callGraph";
 import { SymbolGraph } from "./symbol/symbolGraph";
+import { ImportGraph } from "./graph/importGraph";
+import path from "path";
+
+const importGraph = new ImportGraph();
+
 export function analyzeFile(filePath: string): FileReport {
   const dependencyGraph = new DependencyGraph();
   const callGraph = new CallGraph();
@@ -223,7 +228,12 @@ export function analyzeFile(filePath: string): FileReport {
     }
 
     if (ts.isImportDeclaration(node)) {
-      importCount++;
+      const moduleSpecifier = node.moduleSpecifier;
+      if (ts.isStringLiteral(moduleSpecifier)) {
+        const resolved = path.resolve(path.dirname(filePath), moduleSpecifier.text);
+        importGraph.addImport(filePath, resolved);
+      }
+      // importCount++;
     }
 
     if (ts.isCallExpression(node)) {
@@ -288,6 +298,7 @@ export function analyzeFile(filePath: string): FileReport {
 
   // callGraph.print();
   symbolGraph.print();
+  importGraph.print();
 
   // 测试使用
   // for (const [name, binding] of currentScope.bindings) {
