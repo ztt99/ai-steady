@@ -8,3 +8,7 @@
 // let a = b + 1;
 
 import fn from "../cli";
+
+export const a = 1;
+
+export function foo() {}

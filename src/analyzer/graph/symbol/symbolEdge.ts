@@ -1,4 +1,4 @@
-import { Binding } from "../binding/Binding";
+import { Binding } from "../../binding/Binding";
 
 export type EdgeType = "dependency" | "call" | "reference";
 

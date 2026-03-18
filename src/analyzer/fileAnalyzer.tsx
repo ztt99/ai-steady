@@ -11,16 +11,20 @@ import { DependencyGraph } from "./graph/dependencyGraph";
 import { Binding } from "./binding/Binding";
 import { ImpactAnalyzer } from "./graph/impactAnalyzer";
 import { CallGraph } from "./graph/callGraph";
-import { SymbolGraph } from "./symbol/symbolGraph";
+import { SymbolGraph } from "./graph/symbol/symbolGraph";
 import { ImportGraph } from "./graph/importGraph";
 import path from "path";
+import { ModuleGraph } from "./graph/module/moduleGraph";
 
 const importGraph = new ImportGraph();
+const moduleGraph = new ModuleGraph();
 
 export function analyzeFile(filePath: string): FileReport {
   const dependencyGraph = new DependencyGraph();
   const callGraph = new CallGraph();
   const impactAnalyzer = new ImpactAnalyzer(dependencyGraph);
+  const module = moduleGraph.ensureModule(filePath);
+
   const symbolGraph = new SymbolGraph();
   let currentBinding: Binding | undefined;
   let currentFunctionBinding: Binding | undefined;
@@ -43,7 +47,7 @@ export function analyzeFile(filePath: string): FileReport {
   let variableCount = 0;
   let importCount = 0;
   let hasConsoleLog = false;
-  let currentScope: Scope;
+  let currentScope: Scope | undefined;
   const context = new AnalyzerContext();
 
   currentScope = new Scope("global");
@@ -59,6 +63,9 @@ export function analyzeFile(filePath: string): FileReport {
     console.log(`[no-undef] (${line + 1}:${character + 1}) ${message}`);
   }
 
+  let previousScope: Scope | undefined;
+  let previousFunctionBinding: Binding | undefined;
+
   function visit(node: ts.Node) {
     ruleInstances.forEach((rule) => {
       rule.enter(node);
@@ -70,9 +77,8 @@ export function analyzeFile(filePath: string): FileReport {
       ts.isArrowFunction(node) ||
       ts.isFunctionExpression(node)
     ) {
-      const previousFunctionBinding = currentFunctionBinding;
-      functionCount++;
-      const previousScope = currentScope;
+      previousFunctionBinding = currentFunctionBinding;
+      previousScope = currentScope;
       // 创建新作用域，并将previousScope作用域传递  push
       currentScope = new Scope("function", previousScope);
       if (node.body && ts.isBlock(node.body)) {
@@ -82,7 +88,7 @@ export function analyzeFile(filePath: string): FileReport {
       //  处理参数声明
       node.parameters.forEach((param) => {
         if (ts.isIdentifier(param.name)) {
-          currentScope.declare(param.name.text, "param", param);
+          currentScope?.declare(param.name.text, "param", param);
         }
       });
 
@@ -97,29 +103,17 @@ export function analyzeFile(filePath: string): FileReport {
           currentFunctionBinding = binding;
         }
       }
-
-      ts.forEachChild(node, visit);
-
-      // 恢复作用域 pop
-      currentScope = previousScope;
-      currentFunctionBinding = previousFunctionBinding;
-      return;
     }
 
     if (ts.isBlock(node)) {
       const parent = node.parent;
       // 如果是函数的 body 那么不给创建块作用域
-      if (parent && isFunctionWithBody(parent) && parent.body === node) {
-        ts.forEachChild(node, visit);
-        return;
+      const isFunctionBody = parent && isFunctionWithBody(parent) && parent.body === node;
+      if (!isFunctionBody) {
+        previousScope = currentScope;
+        currentScope = new Scope("block", previousScope);
+        collectHoistedDeclarations(node, currentScope);
       }
-
-      const previousScope = currentScope;
-      currentScope = new Scope("block", previousScope);
-      collectHoistedDeclarations(node, currentScope);
-      ts.forEachChild(node, visit);
-      currentScope = previousScope;
-      return;
     }
 
     // 如果是声明，这时候将变量提升的状态修改
@@ -133,16 +127,16 @@ export function analyzeFile(filePath: string): FileReport {
 
         if (getVariableKind(declarationList) === "var") {
           let scope = currentScope;
-          while (scope.parent && !scope.isFunctionScope()) {
+          while (scope?.parent && !scope.isFunctionScope()) {
             scope = scope.parent;
           }
 
-          const bindings = scope.resolve(text);
+          const bindings = scope?.resolve(text);
           bindings?.initialize();
           currentBinding = bindings;
         } else {
           // 如果是 let const
-          const bindings = currentScope.resolve(text);
+          const bindings = currentScope?.resolve(text);
           bindings?.initialize();
           currentBinding = bindings;
         }
@@ -229,9 +223,19 @@ export function analyzeFile(filePath: string): FileReport {
 
     if (ts.isImportDeclaration(node)) {
       const moduleSpecifier = node.moduleSpecifier;
-      if (ts.isStringLiteral(moduleSpecifier)) {
-        const resolved = path.resolve(path.dirname(filePath), moduleSpecifier.text);
-        importGraph.addImport(filePath, resolved);
+      const importClause = node.importClause;
+      if (
+        ts.isStringLiteral(moduleSpecifier) &&
+        importClause?.name &&
+        ts.isImportClause(importClause)
+      ) {
+        const target = path.resolve(filePath, moduleSpecifier.text);
+        const targetModule = moduleGraph.ensureModule(target);
+        // target 被导入了 filePath
+        targetModule.importers.add(filePath);
+        // 记录当前 module，依赖谁
+        module.dependencies.add(target);
+        // importGraph.addImport(filePath, resolved);
       }
       // importCount++;
     }
@@ -259,6 +263,11 @@ export function analyzeFile(filePath: string): FileReport {
 
     ts.forEachChild(node, visit);
 
+    // 处理export 阶段
+    handleExport(node);
+    // 恢复作用域 pop
+    currentScope = previousScope;
+    currentFunctionBinding = previousFunctionBinding;
     ruleInstances.forEach((rule) => {
       rule.exit(node);
     });
@@ -311,6 +320,69 @@ export function analyzeFile(filePath: string): FileReport {
   //     );
   //   }
   // }
+
+  function handleExport(node: ts.Node) {
+    //export function getUser() {}
+    if (ts.isFunctionDeclaration(node)) {
+      if (hasExportModifier(node)) {
+        const name = node.name?.text;
+        if (!name) return;
+
+        const binding = currentScope.resolve(name);
+
+        if (binding) {
+          module.exports.set(name, binding);
+        }
+      }
+    }
+    // export function getUser() {}
+    if (ts.isVariableStatement(node)) {
+      if (hasExportModifier(node)) {
+        node.declarationList.declarations.forEach((decl) => {
+          if (ts.isIdentifier(decl.name)) {
+            const name = decl.name.text;
+
+            const binding = currentScope.resolve(name);
+
+            if (binding) {
+              module.exports.set(name, binding);
+            }
+          }
+        });
+      }
+    }
+    // const foo = 1;
+    // export { foo };
+    if (ts.isExportDeclaration(node)) {
+      if (!node.exportClause) return;
+      const named = node.exportClause;
+
+      if (ts.isNamedExports(named)) {
+        named.elements.forEach((el) => {
+          const name = el.propertyName?.text ?? el.name.text;
+
+          const binding = currentScope.resolve(name);
+
+          if (binding) {
+            module.exports.set(el.name.text, binding);
+          }
+        });
+      }
+    }
+    // export default function () {}
+    if (ts.isExportAssignment(node)) {
+      const expr = node.expression;
+
+      if (ts.isIdentifier(expr)) {
+        const binding = currentScope.resolve(expr.text);
+
+        if (binding) {
+          module.exports.set("default", binding);
+        }
+      }
+    }
+  }
+  console.log(moduleGraph.ensureModule(filePath));
 
   return {
     filePath,
@@ -443,4 +515,8 @@ function isFunctionWithBody(
     ts.isArrowFunction(node) ||
     ts.isMethodDeclaration(node)
   );
+}
+
+function hasExportModifier(node: ts.FunctionDeclaration | ts.VariableStatement): boolean {
+  return !!node.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
 }

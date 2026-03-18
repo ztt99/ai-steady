@@ -1,4 +1,4 @@
-import { Binding } from "../binding/Binding";
+import { Binding } from "../../binding/Binding";
 
 export class SymbolNode {
   binding: Binding;
