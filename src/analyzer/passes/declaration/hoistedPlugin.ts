@@ -1,51 +1,13 @@
 import ts from "typescript";
-import { Scope } from "../scope/scope";
-import { Binding } from "../binding/Binding";
-import Reference from "../reference/reference";
-import { ModuleGraph } from "../graph/module/moduleGraph";
-import { SymbolGraph } from "../graph/symbol/symbolGraph";
-import { collectBindingNames, getVariableKind } from "../utils";
+import { AnalyzerPlugin } from "../../core/analyzer";
+import { AnalyzerContext } from "../../core/context";
+import { collectBindingNames, getVariableKind, isFunctionBody } from "../../utils";
 
-export class AnalyzerContext {
-  sourceFile: ts.SourceFile;
-  filePath: string;
-
-  // scope
-  currentScope!: Scope;
-
-  // binding stack
-  currentBinding?: Binding;
-  currentFunctionBinding?: Binding;
-
-  // data
-  references: Reference[] = [];
-
-  // graph
-  symbolGraph = new SymbolGraph();
-  moduleGraph = new ModuleGraph();
-
-  scopeMap = new Map();
-  constructor(filePath: string, sourceFile: ts.SourceFile) {
-    this.filePath = filePath;
-    this.sourceFile = sourceFile;
-
-    this.currentScope = new Scope("global");
-    this.scopeMap.set(sourceFile, this.currentScope);
-  }
-
-  pushScope(type: "function" | "block") {
-    this.currentScope = new Scope(type, this.currentScope);
-  }
-
-  popScope() {
-    if (this.currentScope.parent) {
-      this.currentScope = this.currentScope.parent;
-    }
-  }
-  collectHoisted(node: ts.Node) {
+export class HoistedPlugin implements AnalyzerPlugin {
+  enter(node: ts.Node, ctx: AnalyzerContext) {
     const walkStatement = (node: ts.Node) => {
       if (ts.isFunctionDeclaration(node) && node.name) {
-        let scope = this.currentScope;
+        let scope = ctx.currentScope;
         while (scope.parent && !scope.isFunctionScope()) {
           scope = scope.parent;
         }
@@ -54,7 +16,7 @@ export class AnalyzerContext {
       }
 
       if (ts.isParameter(node) && ts.isIdentifier(node.name)) {
-        this.currentScope.declare(node.name.text, "param", node);
+        ctx.currentScope.declare(node.name.text, "param", node);
         return;
       }
       // 函数声明 return，因为外部有保存 scope 的地方，这里在保存，会重复
@@ -75,18 +37,18 @@ export class AnalyzerContext {
 
         // default import
         if (clause.name) {
-          this.currentScope.declare(clause.name.text, "import", node);
+          ctx.currentScope.declare(clause.name.text, "import", node);
         }
         // named imports
         if (clause.namedBindings) {
           if (ts.isNamedImports(clause.namedBindings)) {
             for (const element of clause.namedBindings.elements) {
-              this.currentScope.declare(element.name.text, "import", element);
+              ctx.currentScope.declare(element.name.text, "import", element);
             }
           }
 
           if (ts.isNamespaceImport(clause.namedBindings)) {
-            this.currentScope.declare(clause.namedBindings.name.text, "import", node);
+            ctx.currentScope.declare(clause.namedBindings.name.text, "import", node);
           }
         }
 
@@ -97,7 +59,7 @@ export class AnalyzerContext {
         if (getVariableKind(node.declarationList) === "var") {
           for (let decl of node.declarationList.declarations) {
             collectBindingNames(decl.name, (name) => {
-              let scope = this.currentScope;
+              let scope = ctx.currentScope;
               while (scope.parent && !scope.isFunctionScope()) {
                 scope = scope.parent;
               }
@@ -108,16 +70,17 @@ export class AnalyzerContext {
           // let const
           for (let decl of node.declarationList.declarations) {
             collectBindingNames(decl.name, (name) => {
-              this.currentScope.declare(name, getVariableKind(node.declarationList), decl);
+              ctx.currentScope.declare(name, getVariableKind(node.declarationList), decl);
             });
           }
         }
 
         return;
       }
-      // ts.forEachChild(node, walkStatement);
     };
 
     ts.forEachChild(node, walkStatement);
   }
+
+  exit(node: ts.Node, ctx: AnalyzerContext) {}
 }

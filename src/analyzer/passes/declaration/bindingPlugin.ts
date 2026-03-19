@@ -1,24 +1,44 @@
 import ts from "typescript";
 import { AnalyzerPlugin } from "../../core/analyzer";
 import { AnalyzerContext } from "../../core/context";
+import { getVariableKind } from "../../utils";
 
 export class BindingPlugin implements AnalyzerPlugin {
   enter(node: ts.Node, ctx: AnalyzerContext) {
-    // function declaration
-    if (ts.isFunctionDeclaration(node) && node.name) {
-      ctx.currentScope.declare(node.name.text, "function", node);
+    console.log(ts.SyntaxKind[node.kind]);
+
+    let nNode = node;
+    let scope = ctx.scopeMap.get(nNode);
+    while (!scope) {
+      nNode = nNode.parent;
+      scope = ctx.scopeMap.get(nNode);
     }
 
-    // variable
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
-      ctx.currentScope.declare(node.name.text, "var", node);
-    }
+      const name = node.name.text;
+      const kind = getVariableKind(node.parent);
 
-    // params
-    if (ts.isParameter(node) && ts.isIdentifier(node.name)) {
-      ctx.currentScope.declare(node.name.text, "param", node);
+      let binding;
+
+      if (kind === "var") {
+        let targetScope = scope;
+        while (targetScope.parent && !targetScope.isFunctionScope()) {
+          targetScope = targetScope.parent;
+        }
+        binding = targetScope.resolve(name);
+      } else {
+        binding = scope.resolve(name);
+      }
+
+      binding?.initialize();
+      ctx.currentBinding = binding;
     }
   }
 
-  exit() {}
+  exit(node: ts.Node, ctx: AnalyzerContext) {
+    if (ts.isVariableDeclaration(node)) {
+      // const binding = ctx.currentBinding;
+      // ctx.currentBinding = undefined;
+    }
+  }
 }

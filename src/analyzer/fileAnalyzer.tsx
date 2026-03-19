@@ -195,7 +195,7 @@ export function analyzeFile(filePath: string): FileReport {
 
       const name = node.text;
 
-      const binding = currentScope.resolve(name);
+      const binding = currentScope?.resolve(name);
 
       const ref = new Reference(name, node, currentScope, binding ?? null);
 
@@ -245,7 +245,7 @@ export function analyzeFile(filePath: string): FileReport {
       const expression = node.expression;
 
       if (ts.isIdentifier(expression)) {
-        const callee = currentScope.resolve(expression.text);
+        const callee = currentScope?.resolve(expression.text);
 
         // 函数执行的时候，能都获取到当前函数名
         if (currentFunctionBinding && callee) {
@@ -328,7 +328,7 @@ export function analyzeFile(filePath: string): FileReport {
         const name = node.name?.text;
         if (!name) return;
 
-        const binding = currentScope.resolve(name);
+        const binding = currentScope?.resolve(name);
 
         if (binding) {
           module.exports.set(name, binding);

@@ -1,6 +1,7 @@
 import ts from "typescript";
 import { AnalyzerPlugin } from "../../core/analyzer";
 import { AnalyzerContext } from "../../core/context";
+import { isFunctionBody } from "../../utils";
 
 export class ScopePlugin implements AnalyzerPlugin {
   enter(node: ts.Node, ctx: AnalyzerContext) {
@@ -10,23 +11,17 @@ export class ScopePlugin implements AnalyzerPlugin {
       ts.isArrowFunction(node)
     ) {
       ctx.pushScope("function");
+      ctx.scopeMap.set(node, ctx.currentScope);
     }
 
     if (ts.isBlock(node)) {
-      const parent = node.parent;
-
-      const isFunctionBody =
-        parent &&
-        (ts.isFunctionDeclaration(parent) ||
-          ts.isFunctionExpression(parent) ||
-          ts.isArrowFunction(parent)) &&
-        parent.body === node;
-
-      if (!isFunctionBody) {
+      if (!isFunctionBody(node)) {
         ctx.pushScope("block");
+        ctx.scopeMap.set(node, ctx.currentScope);
       }
     }
   }
+  beforeChildren(node: ts.Node, ctx: AnalyzerContext) {}
 
   exit(node: ts.Node, ctx: AnalyzerContext) {
     if (

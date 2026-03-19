@@ -7,8 +7,13 @@
 // let b = 0;
 // let a = b + 1;
 
-import fn from "../cli";
+function fn(a) {
+  var b = 2;
+}
 
-export const a = 1;
+var a = 1;
 
-export function foo() {}
+if (true) {
+  var c = 1;
+  let d = 3;
+}

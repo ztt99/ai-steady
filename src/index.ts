@@ -1,5 +1,6 @@
+import { analyzeFile } from "./analyzer/core/analyzer";
 import { getAllTSFiles } from "./scanner/fileScanner";
-import { analyzeFile } from "./analyzer/fileAnalyzer";
+// import { analyzeFile } from "./analyzer/fileAnalyzer";
 import { ProjectReport } from "./types/report";
 
 export function analyzeProject(rootDir?: string): ProjectReport {
@@ -13,13 +14,13 @@ export function analyzeProject(rootDir?: string): ProjectReport {
   for (const file of files) {
     const report = analyzeFile(file);
 
-    totalFunctions += report.functionCount;
-    totalVariables += report.variableCount;
-    totalImports += report.importCount;
+    // totalFunctions += report.functionCount;
+    // totalVariables += report.variableCount;
+    // totalImports += report.importCount;
 
-    if (report.hasConsoleLog) {
-      filesWithConsole.push(file);
-    }
+    // if (report.hasConsoleLog) {
+    //   filesWithConsole.push(file);
+    // }
   }
 
   return {

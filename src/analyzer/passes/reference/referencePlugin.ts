@@ -28,7 +28,13 @@ export class ReferencePlugin implements AnalyzerPlugin {
     if (binding) {
       binding.references.push(ref);
     }
+
+    if (ctx.currentBinding && binding) {
+      ctx.symbolGraph.addEdge(ctx.currentBinding, binding, "dependency");
+    }
   }
 
-  exit() {}
+  exit(node: ts.Node, ctx: AnalyzerContext) {
+    if (ts.isIdentifier(node)) console.log(ctx.currentScope.resolve(node.text));
+  }
 }

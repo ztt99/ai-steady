@@ -2,6 +2,7 @@
 
 import { Command } from "commander";
 import { analyzeProject } from ".";
+// import { analyzeFile } from "./analyzer/fileAnalyzer";
 const program = new Command();
 
 // 定义命令
