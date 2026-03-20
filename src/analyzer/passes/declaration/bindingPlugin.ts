@@ -5,15 +5,7 @@ import { getVariableKind } from "../../utils";
 
 export class BindingPlugin implements AnalyzerPlugin {
   enter(node: ts.Node, ctx: AnalyzerContext) {
-    console.log(ts.SyntaxKind[node.kind]);
-
-    let nNode = node;
-    let scope = ctx.scopeMap.get(nNode);
-    while (!scope) {
-      nNode = nNode.parent;
-      scope = ctx.scopeMap.get(nNode);
-    }
-
+    let scope = ctx.getScope(node);
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
       const name = node.name.text;
       const kind = getVariableKind(node.parent);
@@ -37,8 +29,8 @@ export class BindingPlugin implements AnalyzerPlugin {
 
   exit(node: ts.Node, ctx: AnalyzerContext) {
     if (ts.isVariableDeclaration(node)) {
-      // const binding = ctx.currentBinding;
-      // ctx.currentBinding = undefined;
+      const binding = ctx.currentBinding;
+      ctx.currentBinding = undefined;
     }
   }
 }

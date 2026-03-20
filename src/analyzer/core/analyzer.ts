@@ -34,7 +34,6 @@ export function analyzeFile(filePath: string) {
 
   traverse(sourceFile, prePlugins, ctx);
   traverse(sourceFile, plugins, ctx);
-  debugger;
   return ctx;
 
   function traverse(node: ts.Node, plugins: AnalyzerPlugin[], ctx: AnalyzerContext) {

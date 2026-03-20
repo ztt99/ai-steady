@@ -42,6 +42,17 @@ export class AnalyzerContext {
       this.currentScope = this.currentScope.parent;
     }
   }
+
+  getScope(node: ts.Node) {
+    let nNode = node;
+    let scope = this.scopeMap.get(nNode);
+    while (!scope) {
+      nNode = nNode.parent;
+      scope = this.scopeMap.get(nNode);
+    }
+    return scope;
+  }
+
   collectHoisted(node: ts.Node) {
     const walkStatement = (node: ts.Node) => {
       if (ts.isFunctionDeclaration(node) && node.name) {
