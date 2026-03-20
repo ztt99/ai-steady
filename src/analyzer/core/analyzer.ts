@@ -9,6 +9,8 @@ import { ExportPlugin } from "../passes/declaration/exportPlugin";
 import { ReferencePlugin } from "../passes/reference/referencePlugin";
 import { CallGraphPlugin } from "../passes/reference/callGraphPlugin";
 import { HoistedPlugin } from "../passes/declaration/hoistedPlugin";
+import { ImportGraph } from "../graph/importGraph";
+import { ImportPlugin } from "../passes/declaration/importPlugin";
 
 export interface AnalyzerPlugin {
   enter(node: ts.Node, ctx: AnalyzerContext): void;
@@ -27,9 +29,10 @@ export function analyzeFile(filePath: string) {
 
   const plugins: AnalyzerPlugin[] = [
     new BindingPlugin(),
-    // new ExportPlugin(),
+    new ExportPlugin(),
     new ReferencePlugin(),
-    // new CallGraphPlugin(),
+    new CallGraphPlugin(),
+    new ImportPlugin(),
   ];
 
   traverse(sourceFile, prePlugins, ctx);
