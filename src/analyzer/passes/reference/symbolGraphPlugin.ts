@@ -6,7 +6,7 @@ export class SymbolGraphPlugin implements AnalyzerPlugin {
   enter(node: ts.Node, ctx: AnalyzerContext) {
     if (!ts.isIdentifier(node)) return;
 
-    const binding = ctx.currentScope.resolve(node.text);
+    const binding = ctx.getScope(node).resolve(node.text);
 
     if (ctx.currentBinding && binding) {
       ctx.symbolGraph.addEdge(ctx.currentBinding, binding, "dependency");

@@ -9,7 +9,7 @@ export class CallGraphPlugin implements AnalyzerPlugin {
     const expr = node.expression;
 
     if (ts.isIdentifier(expr)) {
-      const callee = ctx.currentScope.resolve(expr.text);
+      const callee = ctx.getScope(node).resolve(expr.text);
 
       if (ctx.currentFunctionBinding && callee) {
         ctx.symbolGraph.addEdge(ctx.currentFunctionBinding, callee, "call");

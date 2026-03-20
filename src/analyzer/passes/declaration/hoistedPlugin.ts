@@ -1,80 +1,64 @@
 import ts from "typescript";
 import { AnalyzerPlugin } from "../../core/analyzer";
 import { AnalyzerContext } from "../../core/context";
-import { collectBindingNames, getVariableKind, isFunctionBody } from "../../utils";
+import { collectBindingNames, getVariableKind } from "../../utils";
 
+/**
+ * HoistedPlugin - 变量提升插件
+ *
+ * 在代码执行前，预先声明所有需要提升的绑定：
+ * - function 声明：完整提升（函数体也提升）
+ * - var 声明：部分提升（只提升声明，不提升赋值）
+ * - import 声明：视为已提升
+ * - let/const/class：不提升（暂时性死区）
+ *
+ * 执行顺序：这是第一轮遍历，在 BindingPlugin 之前执行
+ */
 export class HoistedPlugin implements AnalyzerPlugin {
   enter(node: ts.Node, ctx: AnalyzerContext) {
-    const walkStatement = (node: ts.Node) => {
-      if (ts.isFunctionDeclaration(node) && node.name) {
-        let scope = ctx.currentScope;
-        while (scope.parent && !scope.isFunctionScope()) {
-          scope = scope.parent;
-        }
-        scope.declare(node.name.text, "function", node);
+    // 使用内联函数遍历当前节点的所有子语句
+    const walkStatement = (childNode: ts.Node) => {
+      // 函数声明：完整提升到函数作用域
+      if (ts.isFunctionDeclaration(childNode) && childNode.name) {
+        this.declareInFunctionScope(ctx, (scope) => {
+          scope.declare(childNode.name!.text, "function", childNode);
+        });
         return;
       }
 
-      if (ts.isParameter(node) && ts.isIdentifier(node.name)) {
-        ctx.currentScope.declare(node.name.text, "param", node);
-        return;
-      }
-      // 函数声明 return，因为外部有保存 scope 的地方，这里在保存，会重复
-      // 阻止进入 function 作用域边界，永远递归只在 function 边界 return
-      if (
-        ts.isArrowFunction(node) ||
-        ts.isFunctionExpression(node) ||
-        ts.isClassDeclaration(node) ||
-        ts.isMethodDeclaration(node) ||
-        ts.isFunctionDeclaration(node)
-      ) {
+      // 函数参数：声明在当前函数作用域
+      if (ts.isParameter(childNode) && ts.isIdentifier(childNode.name)) {
+        ctx.currentScope.declare(childNode.name.text, "param", childNode);
         return;
       }
 
-      if (ts.isImportDeclaration(node)) {
-        const clause = node.importClause;
-        if (!clause) return;
-
-        // default import
-        if (clause.name) {
-          ctx.currentScope.declare(clause.name.text, "import", node);
-        }
-        // named imports
-        if (clause.namedBindings) {
-          if (ts.isNamedImports(clause.namedBindings)) {
-            for (const element of clause.namedBindings.elements) {
-              ctx.currentScope.declare(element.name.text, "import", element);
-            }
-          }
-
-          if (ts.isNamespaceImport(clause.namedBindings)) {
-            ctx.currentScope.declare(clause.namedBindings.name.text, "import", node);
-          }
-        }
-
+      // 阻止进入函数/类作用域边界
+      // 这些节点会在遍历到它们时单独处理，避免重复声明
+      if (this.isScopeBoundary(childNode)) {
         return;
       }
-      // var 是变量提升 但是不赋值
-      if (ts.isVariableStatement(node)) {
-        if (getVariableKind(node.declarationList) === "var") {
-          for (let decl of node.declarationList.declarations) {
-            collectBindingNames(decl.name, (name) => {
-              let scope = ctx.currentScope;
-              while (scope.parent && !scope.isFunctionScope()) {
-                scope = scope.parent;
-              }
-              scope.declare(name, "var", decl);
-            });
-          }
-        } else {
-          // let const
-          for (let decl of node.declarationList.declarations) {
-            collectBindingNames(decl.name, (name) => {
-              ctx.currentScope.declare(name, getVariableKind(node.declarationList), decl);
-            });
-          }
-        }
 
+      // 导入声明：在模块顶层声明
+      if (ts.isImportDeclaration(childNode)) {
+        this.handleImportDeclaration(childNode, ctx);
+        return;
+      }
+
+      // 变量声明：处理 var 提升和 let/const 声明
+      if (ts.isVariableStatement(childNode)) {
+        this.handleVariableStatement(childNode, ctx);
+        return;
+      }
+
+      // 类声明：let/const 一样，不提升，但需要声明
+      if (ts.isClassDeclaration(childNode) && childNode.name) {
+        this.handleClassDeclaration(childNode, ctx);
+        return;
+      }
+
+      // 捕获句参数
+      if (ts.isCatchClause(childNode)) {
+        this.handleCatchClause(childNode, ctx);
         return;
       }
     };
@@ -82,5 +66,115 @@ export class HoistedPlugin implements AnalyzerPlugin {
     ts.forEachChild(node, walkStatement);
   }
 
-  exit(node: ts.Node, ctx: AnalyzerContext) {}
+  exit(_node: ts.Node, _ctx: AnalyzerContext) {
+    // HoistedPlugin 不需要 exit 处理
+  }
+
+  /**
+   * 检查节点是否是作用域边界
+   */
+  private isScopeBoundary(node: ts.Node): boolean {
+    return (
+      ts.isArrowFunction(node) ||
+      ts.isFunctionExpression(node) ||
+      ts.isClassDeclaration(node) ||
+      ts.isClassExpression(node) ||
+      ts.isMethodDeclaration(node) ||
+      ts.isFunctionDeclaration(node)
+    );
+  }
+
+  /**
+   * 在函数作用域中声明绑定
+   * 用于 function 声明和 var 变量的提升
+   */
+  private declareInFunctionScope(
+    ctx: AnalyzerContext,
+    declareFn: (scope: typeof ctx.currentScope) => void,
+  ): void {
+    let scope = ctx.currentScope;
+    while (scope.parent && !scope.isFunctionScope()) {
+      scope = scope.parent;
+    }
+    declareFn(scope);
+  }
+
+  /**
+   * 处理导入声明
+   */
+  private handleImportDeclaration(node: ts.ImportDeclaration, ctx: AnalyzerContext): void {
+    const clause = node.importClause;
+    if (!clause) return;
+
+    // 默认导入: import foo from 'bar'
+    if (clause.name) {
+      ctx.currentScope.declare(clause.name.text, "import", node);
+    }
+
+    // 命名导入: import { foo, bar } from 'baz'
+    if (clause.namedBindings) {
+      if (ts.isNamedImports(clause.namedBindings)) {
+        for (const element of clause.namedBindings.elements) {
+          // 处理别名: import { foo as bar } from 'baz'
+          ctx.currentScope.declare(element.name.text, "import", element);
+        }
+      }
+
+      // 命名空间导入: import * as foo from 'bar'
+      if (ts.isNamespaceImport(clause.namedBindings)) {
+        ctx.currentScope.declare(clause.namedBindings.name.text, "import", node);
+      }
+    }
+  }
+
+  /**
+   * 处理变量声明语句
+   */
+  private handleVariableStatement(node: ts.VariableStatement, ctx: AnalyzerContext): void {
+    const kind = getVariableKind(node.declarationList);
+
+    for (const decl of node.declarationList.declarations) {
+      collectBindingNames(decl.name, (name) => {
+        if (kind === "var") {
+          // var 变量提升到函数作用域
+          this.declareInFunctionScope(ctx, (scope) => {
+            scope.declare(name, "var", decl);
+          });
+        } else {
+          // let/const 不提升，在当前块级作用域声明
+          ctx.currentScope.declare(name, kind, decl);
+        }
+      });
+    }
+  }
+
+  /**
+   * 处理类声明
+   * 类声明不会被提升（与 let 类似，存在暂时性死区）
+   */
+  private handleClassDeclaration(node: ts.ClassDeclaration, ctx: AnalyzerContext): void {
+    // 类声明在当前作用城声明，不提升
+    // 注：类的提升行为与 let 相同，都是暂时性死区（TDZ）
+    ctx.currentScope.declare(node.name!.text, "function", node);
+  }
+
+  /**
+   * 处理捕获句
+   */
+  private handleCatchClause(node: ts.CatchClause, ctx: AnalyzerContext): void {
+    if (!node.variableDeclaration) return;
+
+    // catch 参数创建一个新的块级作用域
+    // 但在这里只声明绑定，作用域创建在 ScopePlugin 中处理
+    const varDecl = node.variableDeclaration;
+
+    if (ts.isIdentifier(varDecl.name)) {
+      ctx.currentScope.declare(varDecl.name.text, "param", varDecl);
+    } else {
+      // 解构模式: catch ({ message }) { ... }
+      collectBindingNames(varDecl.name, (name) => {
+        ctx.currentScope.declare(name, "param", varDecl);
+      });
+    }
+  }
 }

@@ -28,12 +28,14 @@ export function analyzeFile(filePath: string) {
   const plugins: AnalyzerPlugin[] = [
     new BindingPlugin(),
     // new ExportPlugin(),
-    // new ReferencePlugin(),
+    new ReferencePlugin(),
     // new CallGraphPlugin(),
   ];
 
   traverse(sourceFile, prePlugins, ctx);
   traverse(sourceFile, plugins, ctx);
+  console.log(ctx.symbolGraph.print());
+
   return ctx;
 
   function traverse(node: ts.Node, plugins: AnalyzerPlugin[], ctx: AnalyzerContext) {

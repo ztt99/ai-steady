@@ -6,6 +6,7 @@ export class SymbolGraph {
   nodes = new Map<Binding, SymbolNode>();
 
   edges: SymbolEdge[] = [];
+  reverseEdges: SymbolEdge[] = [];
 
   addNode(binding: Binding) {
     if (!this.nodes.has(binding)) {
@@ -18,8 +19,11 @@ export class SymbolGraph {
     this.addNode(to);
 
     this.edges.push(new SymbolEdge(from, to, type));
+    this.reverseEdges.push(new SymbolEdge(to, from, type));
   }
   print() {
-    console.log(this.edges);
+    for (let e of this.edges) {
+      console.log("dep", e.from.name, "--->", e.to.name);
+    }
   }
 }

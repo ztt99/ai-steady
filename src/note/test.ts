@@ -10,3 +10,12 @@
 var b = 2;
 var c = 3;
 var a = b + c;
+
+function fn() {
+  var d = 1;
+  let b = 2;
+}
+
+function fn2() {
+  fn();
+}

@@ -158,8 +158,8 @@ export class ReferencePlugin implements AnalyzerPlugin {
    * 处理 this 引用
    */
   private handleThisReference(node: ts.Node, ctx: AnalyzerContext) {
-    // this 引用的特殊处理
     const parent = node.parent;
+    const scope = ctx.getScope(node);
 
     // 检查是否是函数调用中的 this
     if (ts.isCallExpression(parent) && parent.expression === node) {
@@ -168,7 +168,7 @@ export class ReferencePlugin implements AnalyzerPlugin {
     }
 
     // 建立特殊的 this 引用
-    const ref = new Reference("this", node as any, ctx.currentScope, null);
+    const ref = new Reference("this", node as any, scope, null);
     ctx.references.push(ref);
   }
 
@@ -177,23 +177,24 @@ export class ReferencePlugin implements AnalyzerPlugin {
    */
   private handleSuperReference(node: ts.Node, ctx: AnalyzerContext) {
     const parent = node.parent;
+    const scope = ctx.getScope(node);
 
     // super() 调用
     if (ts.isCallExpression(parent) && parent.expression === node) {
-      const ref = new Reference("super", node as any, ctx.currentScope, null);
+      const ref = new Reference("super", node as any, scope, null);
       ctx.references.push(ref);
       return;
     }
 
     // super.xxx 属性访问
     if (ts.isPropertyAccessExpression(parent) && parent.expression === node) {
-      const ref = new Reference("super", node as any, ctx.currentScope, null);
+      const ref = new Reference("super", node as any, scope, null);
       ctx.references.push(ref);
       return;
     }
 
     // 普通 super 引用
-    const ref = new Reference("super", node as any, ctx.currentScope, null);
+    const ref = new Reference("super", node as any, scope, null);
     ctx.references.push(ref);
   }
 }
