@@ -2,7 +2,7 @@ import ts from "typescript";
 import { BindKind } from "../../types/binding";
 import { VarState } from "../../types/report";
 import { Scope } from "../scope/scope";
-import Reference from "../reference/Reference";
+import Reference from "../reference/reference";
 
 class Binding {
   name: string;
