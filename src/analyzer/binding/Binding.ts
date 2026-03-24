@@ -1,8 +1,8 @@
 import ts from "typescript";
 import { BindKind } from "../../types/binding";
 import { VarState } from "../../types/report";
-import Reference from "../reference/reference";
 import { Scope } from "../scope/scope";
+import Reference from "../reference/Reference";
 
 class Binding {
   name: string;
@@ -12,6 +12,7 @@ class Binding {
   state: VarState;
   identifier: ts.Node | undefined;
   shadowed: Binding | undefined;
+  used: boolean = false;
 
   constructor(name: string, kind: BindKind, scope: Scope, references: Reference[]) {
     this.name = name;

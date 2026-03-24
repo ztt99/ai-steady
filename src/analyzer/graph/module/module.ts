@@ -40,8 +40,8 @@ export class Module {
 
   /** 引用该模块的模块 */
   importers = new Set<string>();
-  /**定义的变量 */
-  binding = new Set();
+  /** 模块内定义的变量（包括 import 引入的绑定） */
+  bindings = new Set<Binding>();
   constructor(id: string) {
     this.id = id;
   }

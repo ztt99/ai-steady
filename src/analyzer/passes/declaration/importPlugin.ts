@@ -2,6 +2,7 @@ import ts from "typescript";
 import { AnalyzerPlugin } from "../../core/analyzer";
 import { AnalyzerContext } from "../../core/context";
 import { ImportBinding } from "../../graph/module/module";
+import { Binding } from "../../binding/Binding";
 
 /**
  * 导入分析插件 (ImportPlugin)
@@ -20,8 +21,8 @@ import { ImportBinding } from "../../graph/module/module";
  *    - import './module' (只执行副作用，不导入绑定)
  *
  * 注意：
- * - 绑定的声明（declare）是在 HoistedPlugin 中完成的
- * - 这里只负责收集导入信息到 ModuleGraph 和 ImportGraph
+ * - 绑定的声明（declare）在此插件中完成
+ * - 负责收集导入信息到 ModuleGraph 和声明 binding 到作用域
  *
  * 执行顺序：在 HoistedPlugin 之后执行
  */
@@ -57,6 +58,11 @@ export class ImportPlugin implements AnalyzerPlugin {
         importedName: "default",
         source: sourcePath,
       });
+      // 定义 binding 到当前作用域，并关联到模块
+      const binding = new Binding(localName, "import", ctx.currentScope, []);
+      binding.initialize();
+      ctx.getScope(node).declare(localName, binding);
+      // module.bindings.add(binding);
     }
 
     // 处理命名导入和命名空间导入
@@ -65,7 +71,7 @@ export class ImportPlugin implements AnalyzerPlugin {
 
     if (ts.isNamedImports(namedBindings)) {
       // 命名导入: import { foo, bar as baz } from './module'
-      this.handleNamedImports(namedBindings, sourcePath, module.imports);
+      this.handleNamedImports(namedBindings, sourcePath, module, ctx);
     } else if (ts.isNamespaceImport(namedBindings)) {
       // 命名空间导入: import * as foo from './module'
       const localName = namedBindings.name.text;
@@ -74,6 +80,11 @@ export class ImportPlugin implements AnalyzerPlugin {
         importedName: "*",
         source: sourcePath,
       });
+      // 定义 binding 到当前作用域，并关联到模块
+      const binding = new Binding(localName, "import", ctx.currentScope, []);
+      binding.initialize();
+      ctx.getScope(node).declare(localName, binding);
+      // module.bindings.add(binding);
     }
   }
 
@@ -90,12 +101,14 @@ export class ImportPlugin implements AnalyzerPlugin {
    *
    * @param namedBindings 命名导入元素列表
    * @param sourcePath 源模块路径
-   * @param imports 模块的导入映射表
+   * @param module 当前模块
+   * @param ctx 分析上下文
    */
   private handleNamedImports(
     namedBindings: ts.NamedImports,
     sourcePath: string,
-    imports: Map<string, ImportBinding>,
+    module: { imports: Map<string, ImportBinding>; bindings: Set<Binding> },
+    ctx: AnalyzerContext,
   ): void {
     for (const element of namedBindings.elements) {
       // element.name 是本地名称（如果有别名则为别名）
@@ -103,11 +116,16 @@ export class ImportPlugin implements AnalyzerPlugin {
       const localName = element.name.text; // 有别名的时候是别名
       const originalName = element.propertyName?.text ?? localName;
       // 记录导入映射
-      imports.set(localName, {
+      module.imports.set(localName, {
         localName: localName,
         importedName: originalName,
         source: sourcePath,
       });
+      // 定义 binding 到当前作用域，并关联到模块
+      const binding = new Binding(localName, "import", ctx.currentScope, []);
+      binding.initialize();
+      ctx.getScope(element).declare(localName, binding);
+      // module.bindings.add(binding);
     }
   }
 }

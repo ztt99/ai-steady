@@ -21,11 +21,7 @@ class Scope {
   }
 
   //声明时
-  declare(name: string, kind: BindKind, node: ts.Node) {
-    const binding = new Binding(name, kind, this, []);
-
-    binding.createState(kind);
-    binding.identifier = node;
+  declare(name: string, binding: Binding) {
     this.bindings.set(name, binding);
 
     const outerBinding = checkShadow(binding);

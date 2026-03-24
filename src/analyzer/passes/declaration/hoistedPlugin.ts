@@ -2,6 +2,7 @@ import ts from "typescript";
 import { AnalyzerPlugin } from "../../core/analyzer";
 import { AnalyzerContext } from "../../core/context";
 import { collectBindingNames, getVariableKind } from "../../utils";
+import { Binding } from "../../binding/Binding";
 
 /**
  * HoistedPlugin - 变量提升插件
@@ -16,19 +17,28 @@ import { collectBindingNames, getVariableKind } from "../../utils";
  */
 export class HoistedPlugin implements AnalyzerPlugin {
   enter(childNode: ts.Node, ctx: AnalyzerContext) {
+    // 获取当前模块（用于收集变量 binding）
+    const module = ctx.moduleGraph.ensureModule(ctx.filePath);
+
     // 使用内联函数遍历当前节点的所有子语句
     // const walkStatement = (childNode: ts.Node) => {
     // 函数声明：完整提升到函数作用域
     if (ts.isFunctionDeclaration(childNode) && childNode.name) {
       this.declareInFunctionScope(ctx, (scope) => {
-        scope.declare(childNode.name!.text, "function", childNode);
+        const name = childNode.name!.text;
+        const binding = new Binding(childNode.name!.text, "function", scope, []);
+        scope.declare(name, binding);
+        module.bindings.add(binding);
       });
       return;
     }
 
     // 函数参数：声明在当前函数作用域
     if (ts.isParameter(childNode) && ts.isIdentifier(childNode.name)) {
-      ctx.currentScope.declare(childNode.name.text, "param", childNode);
+      const name = childNode.name!.text;
+      const binding = new Binding(childNode.name!.text, "param", ctx.currentScope, []);
+      ctx.currentScope.declare(name, binding);
+      module.bindings.add(binding);
       return;
     }
 
@@ -39,10 +49,10 @@ export class HoistedPlugin implements AnalyzerPlugin {
     }
 
     // 导入声明：在模块顶层声明
-    if (ts.isImportDeclaration(childNode)) {
-      this.handleImportDeclaration(childNode, ctx);
-      return;
-    }
+    // if (ts.isImportDeclaration(childNode)) {
+    //   this.handleImportDeclaration(childNode, ctx);
+    //   return;
+    // }
 
     // 变量声明：处理 var 提升和 let/const 声明
     if (ts.isVariableStatement(childNode)) {
@@ -100,49 +110,26 @@ export class HoistedPlugin implements AnalyzerPlugin {
   }
 
   /**
-   * 处理导入声明
-   */
-  private handleImportDeclaration(node: ts.ImportDeclaration, ctx: AnalyzerContext): void {
-    const clause = node.importClause;
-    if (!clause) return;
-
-    // 默认导入: import foo from 'bar'
-    if (clause.name) {
-      ctx.currentScope.declare(clause.name.text, "import", node);
-    }
-
-    // 命名导入: import { foo, bar } from 'baz'
-    if (clause.namedBindings) {
-      if (ts.isNamedImports(clause.namedBindings)) {
-        for (const element of clause.namedBindings.elements) {
-          // 处理别名: import { foo as bar } from 'baz'
-          ctx.currentScope.declare(element.name.text, "import", element);
-        }
-      }
-
-      // 命名空间导入: import * as foo from 'bar'
-      if (ts.isNamespaceImport(clause.namedBindings)) {
-        ctx.currentScope.declare(clause.namedBindings.name.text, "import", node);
-      }
-    }
-  }
-
-  /**
    * 处理变量声明语句
    */
   private handleVariableStatement(node: ts.VariableStatement, ctx: AnalyzerContext): void {
     const kind = getVariableKind(node.declarationList);
+    const module = ctx.moduleGraph.ensureModule(ctx.filePath);
 
     for (const decl of node.declarationList.declarations) {
       collectBindingNames(decl.name, (name) => {
         if (kind === "var") {
           // var 变量提升到函数作用域
           this.declareInFunctionScope(ctx, (scope) => {
-            scope.declare(name, "var", decl);
+            const binding = new Binding(name, "var", scope, []);
+            scope.declare(name, binding);
+            module.bindings.add(binding);
           });
         } else {
           // let/const 不提升，在当前块级作用域声明
-          ctx.currentScope.declare(name, kind, decl);
+          const binding = new Binding(name, kind, ctx.currentScope, []);
+          ctx.currentScope.declare(name, binding);
+          module.bindings.add(binding);
         }
       });
     }
@@ -155,7 +142,10 @@ export class HoistedPlugin implements AnalyzerPlugin {
   private handleClassDeclaration(node: ts.ClassDeclaration, ctx: AnalyzerContext): void {
     // 类声明在当前作用城声明，不提升
     // 注：类的提升行为与 let 相同，都是暂时性死区（TDZ）
-    ctx.currentScope.declare(node.name!.text, "function", node);
+    const module = ctx.moduleGraph.ensureModule(ctx.filePath);
+    const binding = new Binding(node.name!.text, "function", ctx.currentScope, []);
+    ctx.currentScope.declare(node.name!.text, binding);
+    module.bindings.add(binding);
   }
 
   /**
@@ -167,13 +157,18 @@ export class HoistedPlugin implements AnalyzerPlugin {
     // catch 参数创建一个新的块级作用域
     // 但在这里只声明绑定，作用域创建在 ScopePlugin 中处理
     const varDecl = node.variableDeclaration;
+    const module = ctx.moduleGraph.ensureModule(ctx.filePath);
 
     if (ts.isIdentifier(varDecl.name)) {
-      ctx.currentScope.declare(varDecl.name.text, "param", varDecl);
+      const binding = new Binding(varDecl.name.text, "param", ctx.currentScope, []);
+      ctx.currentScope.declare(varDecl.name.text, binding);
+      module.bindings.add(binding);
     } else {
       // 解构模式: catch ({ message }) { ... }
       collectBindingNames(varDecl.name, (name) => {
-        ctx.currentScope.declare(name, "param", varDecl);
+        const binding = new Binding(name, "param", ctx.currentScope, []);
+        ctx.currentScope.declare(name, binding);
+        module.bindings.add(binding);
       });
     }
   }
