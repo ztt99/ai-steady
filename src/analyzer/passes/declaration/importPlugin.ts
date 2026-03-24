@@ -1,6 +1,7 @@
 import ts from "typescript";
 import { AnalyzerPlugin } from "../../core/analyzer";
 import { AnalyzerContext } from "../../core/context";
+import { ImportBinding } from "../../graph/module/module";
 
 /**
  * 导入分析插件 (ImportPlugin)
@@ -28,9 +29,10 @@ export class ImportPlugin implements AnalyzerPlugin {
   enter(node: ts.Node, ctx: AnalyzerContext): void {
     // 只处理导入声明
     if (!ts.isImportDeclaration(node)) return;
+    debugger;
 
     // 获取当前模块
-    const module = ctx.moduleGraph.ensureModule(ctx.filePath);
+    const module = ctx.graph.ensureModule(ctx.filePath);
 
     // 获取源模块路径
     const moduleSpecifier = node.moduleSpecifier;
@@ -40,7 +42,6 @@ export class ImportPlugin implements AnalyzerPlugin {
 
     // 记录模块依赖关系
     module.dependencies.add(sourcePath);
-
     // 处理空导入 (import './module')
     const importClause = node.importClause;
     if (!importClause) {
@@ -52,7 +53,11 @@ export class ImportPlugin implements AnalyzerPlugin {
     if (importClause.name) {
       const localName = importClause.name.text;
       // 记录导入映射: 本地名称 -> 源模块
-      module.imports.set(localName, sourcePath);
+      module.imports.set(localName, {
+        localName: localName,
+        importedName: "default",
+        source: sourcePath,
+      });
     }
 
     // 处理命名导入和命名空间导入
@@ -65,7 +70,11 @@ export class ImportPlugin implements AnalyzerPlugin {
     } else if (ts.isNamespaceImport(namedBindings)) {
       // 命名空间导入: import * as foo from './module'
       const localName = namedBindings.name.text;
-      module.imports.set(localName, sourcePath);
+      module.imports.set(localName, {
+        localName,
+        importedName: "*",
+        source: sourcePath,
+      });
     }
   }
 
@@ -87,18 +96,19 @@ export class ImportPlugin implements AnalyzerPlugin {
   private handleNamedImports(
     namedBindings: ts.NamedImports,
     sourcePath: string,
-    imports: Map<string, string>,
+    imports: Map<string, ImportBinding>,
   ): void {
     for (const element of namedBindings.elements) {
       // element.name 是本地名称（如果有别名则为别名）
       // element.propertyName 是原名（仅在有别名时存在）
-      const localName = element.name.text;
-
+      const localName = element.name.text; // 有别名的时候是别名
+      const originalName = element.propertyName?.text ?? localName;
       // 记录导入映射
-      imports.set(localName, sourcePath);
-
-      // 如果需要记录原名与别名的映射关系，可以在这里扩展
-      // const originalName = element.propertyName?.text ?? localName;
+      imports.set(localName, {
+        localName: localName,
+        importedName: originalName,
+        source: sourcePath,
+      });
     }
   }
 }

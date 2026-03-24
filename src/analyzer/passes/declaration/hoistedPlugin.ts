@@ -15,55 +15,55 @@ import { collectBindingNames, getVariableKind } from "../../utils";
  * 执行顺序：这是第一轮遍历，在 BindingPlugin 之前执行
  */
 export class HoistedPlugin implements AnalyzerPlugin {
-  enter(node: ts.Node, ctx: AnalyzerContext) {
+  enter(childNode: ts.Node, ctx: AnalyzerContext) {
     // 使用内联函数遍历当前节点的所有子语句
-    const walkStatement = (childNode: ts.Node) => {
-      // 函数声明：完整提升到函数作用域
-      if (ts.isFunctionDeclaration(childNode) && childNode.name) {
-        this.declareInFunctionScope(ctx, (scope) => {
-          scope.declare(childNode.name!.text, "function", childNode);
-        });
-        return;
-      }
+    // const walkStatement = (childNode: ts.Node) => {
+    // 函数声明：完整提升到函数作用域
+    if (ts.isFunctionDeclaration(childNode) && childNode.name) {
+      this.declareInFunctionScope(ctx, (scope) => {
+        scope.declare(childNode.name!.text, "function", childNode);
+      });
+      return;
+    }
 
-      // 函数参数：声明在当前函数作用域
-      if (ts.isParameter(childNode) && ts.isIdentifier(childNode.name)) {
-        ctx.currentScope.declare(childNode.name.text, "param", childNode);
-        return;
-      }
+    // 函数参数：声明在当前函数作用域
+    if (ts.isParameter(childNode) && ts.isIdentifier(childNode.name)) {
+      ctx.currentScope.declare(childNode.name.text, "param", childNode);
+      return;
+    }
 
-      // 阻止进入函数/类作用域边界
-      // 这些节点会在遍历到它们时单独处理，避免重复声明
-      if (this.isScopeBoundary(childNode)) {
-        return;
-      }
+    // 阻止进入函数/类作用域边界
+    // 这些节点会在遍历到它们时单独处理，避免重复声明
+    if (this.isScopeBoundary(childNode)) {
+      return;
+    }
 
-      // 导入声明：在模块顶层声明
-      if (ts.isImportDeclaration(childNode)) {
-        this.handleImportDeclaration(childNode, ctx);
-        return;
-      }
+    // 导入声明：在模块顶层声明
+    if (ts.isImportDeclaration(childNode)) {
+      this.handleImportDeclaration(childNode, ctx);
+      return;
+    }
 
-      // 变量声明：处理 var 提升和 let/const 声明
-      if (ts.isVariableStatement(childNode)) {
-        this.handleVariableStatement(childNode, ctx);
-        return;
-      }
+    // 变量声明：处理 var 提升和 let/const 声明
+    if (ts.isVariableStatement(childNode)) {
+      this.handleVariableStatement(childNode, ctx);
+      return;
+    }
 
-      // 类声明：let/const 一样，不提升，但需要声明
-      if (ts.isClassDeclaration(childNode) && childNode.name) {
-        this.handleClassDeclaration(childNode, ctx);
-        return;
-      }
+    // 类声明：let/const 一样，不提升，但需要声明
+    if (ts.isClassDeclaration(childNode) && childNode.name) {
+      this.handleClassDeclaration(childNode, ctx);
+      return;
+    }
 
-      // 捕获句参数
-      if (ts.isCatchClause(childNode)) {
-        this.handleCatchClause(childNode, ctx);
-        return;
-      }
-    };
+    // 捕获句参数
+    if (ts.isCatchClause(childNode)) {
+      this.handleCatchClause(childNode, ctx);
+      return;
+    }
+    // };
 
-    ts.forEachChild(node, walkStatement);
+    // ts.forEachChild(node, walkStatement);
   }
 
   exit(_node: ts.Node, _ctx: AnalyzerContext) {

@@ -11,6 +11,7 @@ import { CallGraphPlugin } from "../passes/reference/callGraphPlugin";
 import { HoistedPlugin } from "../passes/declaration/hoistedPlugin";
 import { ImportGraph } from "../graph/importGraph";
 import { ImportPlugin } from "../passes/declaration/importPlugin";
+import { ModuleGraph } from "../graph/module/moduleGraph";
 
 export interface AnalyzerPlugin {
   enter(node: ts.Node, ctx: AnalyzerContext): void;
@@ -18,12 +19,12 @@ export interface AnalyzerPlugin {
   beforeChildren?: (node: ts.Node, ctx: AnalyzerContext) => void;
 }
 
-export function analyzeFile(filePath: string) {
+export function analyzeFile(filePath: string, graph: ModuleGraph) {
   const code = fs.readFileSync(filePath, "utf-8");
 
   const sourceFile = ts.createSourceFile(filePath, code, ts.ScriptTarget.Latest, true);
 
-  const ctx = new AnalyzerContext(filePath, sourceFile);
+  const ctx = new AnalyzerContext(filePath, sourceFile, graph);
 
   const prePlugins: AnalyzerPlugin[] = [new ScopePlugin(), new HoistedPlugin()];
 
@@ -37,8 +38,6 @@ export function analyzeFile(filePath: string) {
 
   traverse(sourceFile, prePlugins, ctx);
   traverse(sourceFile, plugins, ctx);
-  console.log(ctx.symbolGraph.print());
-
   return ctx;
 
   function traverse(node: ts.Node, plugins: AnalyzerPlugin[], ctx: AnalyzerContext) {

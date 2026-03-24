@@ -11,11 +11,17 @@ export interface ReExportInfo {
   exportClause: ts.NamedExports | ts.NamespaceExport | undefined;
 }
 
+export type ImportBinding = {
+  localName: string; // foo
+  importedName: string; // foo / default / *
+  source: string; // "./a"
+};
+
 export class Module {
   id: string;
 
   /** 导入映射: 本地名称 -> 源模块 */
-  imports = new Map<string, string>();
+  imports = new Map<string, ImportBinding>();
 
   /** 命名导出: 导出名称 -> 绑定 */
   exports = new Map<string, Binding>();

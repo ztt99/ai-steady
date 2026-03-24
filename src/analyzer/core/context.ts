@@ -4,7 +4,7 @@ import { Binding } from "../binding/Binding";
 import Reference from "../reference/reference";
 import { ModuleGraph } from "../graph/module/moduleGraph";
 import { SymbolGraph } from "../graph/symbol/symbolGraph";
-import { collectBindingNames, getVariableKind } from "../utils";
+import { Resolver, ResolveResult } from "./resolver";
 
 export class AnalyzerContext {
   sourceFile: ts.SourceFile;
@@ -22,15 +22,30 @@ export class AnalyzerContext {
 
   // graph
   symbolGraph = new SymbolGraph();
-  moduleGraph = new ModuleGraph();
+  graph: ModuleGraph;
 
   scopeMap = new Map();
-  constructor(filePath: string, sourceFile: ts.SourceFile) {
+
+  // resolver
+  private resolver?: Resolver;
+
+  constructor(filePath: string, sourceFile: ts.SourceFile, graph: ModuleGraph) {
     this.filePath = filePath;
     this.sourceFile = sourceFile;
 
+    this.graph = graph;
     this.currentScope = new Scope("global");
     this.scopeMap.set(sourceFile, this.currentScope);
+  }
+
+  /**
+   * 获取解析器实例（懒加载）
+   */
+  getResolver(): Resolver {
+    if (!this.resolver) {
+      this.resolver = new Resolver(this);
+    }
+    return this.resolver;
   }
 
   pushScope(type: "function" | "block") {
@@ -53,82 +68,20 @@ export class AnalyzerContext {
     return scope;
   }
 
-  collectHoisted(node: ts.Node) {
-    const walkStatement = (node: ts.Node) => {
-      if (ts.isFunctionDeclaration(node) && node.name) {
-        let scope = this.currentScope;
-        while (scope.parent && !scope.isFunctionScope()) {
-          scope = scope.parent;
-        }
-        scope.declare(node.name.text, "function", node);
-        return;
-      }
+  /**
+   * 解析变量（跨文件）
+   * @param name - 变量名
+   * @param file - 文件路径
+   * @returns 解析结果
+   */
+  resolve(name: string, file: string = this.filePath): ResolveResult {
+    return this.getResolver().resolve(name, file);
+  }
 
-      if (ts.isParameter(node) && ts.isIdentifier(node.name)) {
-        this.currentScope.declare(node.name.text, "param", node);
-        return;
-      }
-      // 函数声明 return，因为外部有保存 scope 的地方，这里在保存，会重复
-      // 阻止进入 function 作用域边界，永远递归只在 function 边界 return
-      if (
-        ts.isArrowFunction(node) ||
-        ts.isFunctionExpression(node) ||
-        ts.isClassDeclaration(node) ||
-        ts.isMethodDeclaration(node) ||
-        ts.isFunctionDeclaration(node)
-      ) {
-        return;
-      }
-
-      if (ts.isImportDeclaration(node)) {
-        const clause = node.importClause;
-        if (!clause) return;
-
-        // default import
-        if (clause.name) {
-          this.currentScope.declare(clause.name.text, "import", node);
-        }
-        // named imports
-        if (clause.namedBindings) {
-          if (ts.isNamedImports(clause.namedBindings)) {
-            for (const element of clause.namedBindings.elements) {
-              this.currentScope.declare(element.name.text, "import", element);
-            }
-          }
-
-          if (ts.isNamespaceImport(clause.namedBindings)) {
-            this.currentScope.declare(clause.namedBindings.name.text, "import", node);
-          }
-        }
-
-        return;
-      }
-      // var 是变量提升 但是不赋值
-      if (ts.isVariableStatement(node)) {
-        if (getVariableKind(node.declarationList) === "var") {
-          for (let decl of node.declarationList.declarations) {
-            collectBindingNames(decl.name, (name) => {
-              let scope = this.currentScope;
-              while (scope.parent && !scope.isFunctionScope()) {
-                scope = scope.parent;
-              }
-              scope.declare(name, "var", decl);
-            });
-          }
-        } else {
-          // let const
-          for (let decl of node.declarationList.declarations) {
-            collectBindingNames(decl.name, (name) => {
-              this.currentScope.declare(name, getVariableKind(node.declarationList), decl);
-            });
-          }
-        }
-
-        return;
-      }
-      // ts.forEachChild(node, walkStatement);
-    };
-
-    ts.forEachChild(node, walkStatement);
+  /**
+   * 批量解析多个变量
+   */
+  resolveMany(names: string[], file: string = this.filePath) {
+    return this.getResolver().resolveMany(names, file);
   }
 }
