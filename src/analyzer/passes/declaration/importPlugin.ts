@@ -29,10 +29,9 @@ export class ImportPlugin implements AnalyzerPlugin {
   enter(node: ts.Node, ctx: AnalyzerContext): void {
     // 只处理导入声明
     if (!ts.isImportDeclaration(node)) return;
-    debugger;
 
     // 获取当前模块
-    const module = ctx.graph.ensureModule(ctx.filePath);
+    const module = ctx.moduleGraph.ensureModule(ctx.filePath);
 
     // 获取源模块路径
     const moduleSpecifier = node.moduleSpecifier;

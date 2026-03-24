@@ -99,7 +99,7 @@ export class Resolver {
    * 执行实际的解析逻辑
    */
   private doResolve(name: string, file: string, scope = this.ctx.currentScope): ResolveResult {
-    const module = this.ctx.graph.ensureModule(file);
+    const module = this.ctx.moduleGraph.ensureModule(file);
 
     // 1. 先在当前作用域链中查找本地绑定
     const localBinding = scope.resolve(name);
@@ -171,7 +171,7 @@ export class Resolver {
     }
 
     // 获取源模块
-    const targetModule = this.ctx.graph.ensureModule(sourceModule);
+    const targetModule = this.ctx.moduleGraph.ensureModule(sourceModule);
     // 在源模块中查找导出
     const exportResult = this.resolveExport(targetModule, importBinding.localName);
 
@@ -250,7 +250,7 @@ export class Resolver {
       // export * from '...'
       if (!reExport.exportClause) {
         // 需要在源模块中查找
-        const targetModule = this.ctx.graph.ensureModule(reExport.source);
+        const targetModule = this.ctx.moduleGraph.ensureModule(reExport.source);
         const result = this.resolveExport(targetModule, name);
         if (result.found) {
           return { found: true, binding: result.binding, reExport };
@@ -284,7 +284,7 @@ export class Resolver {
     name: string,
     currentModule: string,
   ): ResolveResult {
-    const sourceModule = this.ctx.graph.ensureModule(reExport.source);
+    const sourceModule = this.ctx.moduleGraph.ensureModule(reExport.source);
 
     // 在源模块中查找
     const result = this.resolveExport(sourceModule, name);

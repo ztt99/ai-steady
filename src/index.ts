@@ -1,5 +1,6 @@
 import { analyzeFile } from "./analyzer/core/analyzer";
 import { ModuleGraph } from "./analyzer/graph/module/moduleGraph";
+import { DependencyGraphBuilder } from "./analyzer/graphDep";
 import { getAllTSFiles } from "./scanner/fileScanner";
 // import { analyzeFile } from "./analyzer/fileAnalyzer";
 import { ProjectReport } from "./types/report";
@@ -23,8 +24,8 @@ export function analyzeProject(rootDir?: string): ProjectReport {
     // }
   }
 
-  console.log(moduleGraph);
-
+  const depGraph = new DependencyGraphBuilder(moduleGraph);
+  console.log(depGraph.build());
   return {
     totalFiles: files.length,
     totalFunctions,

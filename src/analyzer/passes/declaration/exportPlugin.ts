@@ -26,7 +26,7 @@ import { collectBindingNames } from "../../utils";
 export class ExportPlugin implements AnalyzerPlugin {
   enter(node: ts.Node, ctx: AnalyzerContext) {
     // 获取或创建当前模块节点
-    const module = ctx.graph.ensureModule(ctx.filePath);
+    const module = ctx.moduleGraph.ensureModule(ctx.filePath);
     const scope = ctx.getScope(node);
 
     // 处理带 export 修饰符的函数声明
@@ -148,7 +148,7 @@ export class ExportPlugin implements AnalyzerPlugin {
   private handleDefaultExport(
     node: ts.ExportAssignment,
     scope: ReturnType<AnalyzerContext["getScope"]>,
-    module: ReturnType<AnalyzerContext["graph"]["ensureModule"]>,
+    module: ReturnType<AnalyzerContext["moduleGraph"]["ensureModule"]>,
   ): void {
     // 获取默认导出的表达式
     const expression = node.expression;
@@ -187,7 +187,7 @@ export class ExportPlugin implements AnalyzerPlugin {
   private handleExportDeclaration(
     node: ts.ExportDeclaration,
     scope: ReturnType<AnalyzerContext["getScope"]>,
-    module: ReturnType<AnalyzerContext["graph"]["ensureModule"]>,
+    module: ReturnType<AnalyzerContext["moduleGraph"]["ensureModule"]>,
   ): void {
     // 处理重新导出：export { foo } from './module'
     if (node.moduleSpecifier) {

@@ -19,12 +19,12 @@ export interface AnalyzerPlugin {
   beforeChildren?: (node: ts.Node, ctx: AnalyzerContext) => void;
 }
 
-export function analyzeFile(filePath: string, graph: ModuleGraph) {
+export function analyzeFile(filePath: string, moduleGraph: ModuleGraph) {
   const code = fs.readFileSync(filePath, "utf-8");
 
   const sourceFile = ts.createSourceFile(filePath, code, ts.ScriptTarget.Latest, true);
 
-  const ctx = new AnalyzerContext(filePath, sourceFile, graph);
+  const ctx = new AnalyzerContext(filePath, sourceFile, moduleGraph);
 
   const prePlugins: AnalyzerPlugin[] = [new ScopePlugin(), new HoistedPlugin()];
 

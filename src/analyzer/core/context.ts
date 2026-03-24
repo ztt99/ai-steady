@@ -22,18 +22,18 @@ export class AnalyzerContext {
 
   // graph
   symbolGraph = new SymbolGraph();
-  graph: ModuleGraph;
+  moduleGraph: ModuleGraph;
 
   scopeMap = new Map();
 
   // resolver
   private resolver?: Resolver;
 
-  constructor(filePath: string, sourceFile: ts.SourceFile, graph: ModuleGraph) {
+  constructor(filePath: string, sourceFile: ts.SourceFile, moduleGraph: ModuleGraph) {
     this.filePath = filePath;
     this.sourceFile = sourceFile;
 
-    this.graph = graph;
+    this.moduleGraph = moduleGraph;
     this.currentScope = new Scope("global");
     this.scopeMap.set(sourceFile, this.currentScope);
   }
