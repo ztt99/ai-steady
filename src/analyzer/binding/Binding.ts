@@ -14,6 +14,13 @@ class Binding {
   shadowed: Binding | undefined;
   used: boolean = false;
 
+  /** 导出源 binding（用于 import 的实时绑定） */
+  exportSource?: Binding;
+  /** 被哪些 binding 导入（反向链接） */
+  importedBy: Binding[] = [];
+  /** 所在模块路径 */
+  moduleId?: string;
+
   constructor(name: string, kind: BindKind, scope: Scope, references: Reference[]) {
     this.name = name;
     this.kind = kind;

@@ -71,7 +71,87 @@ if (found) {
 }
 ```
 
-### 4. Tree-shaking 分析
+### 4. 跨模块影响分析 (Live Binding)
+
+ES 模块的导入导出是实时绑定（Live Binding）。当 `a.js` 导出 `n`，`b.js` 导入 `n` 时：
+- `a.n` 和 `b.n` 是同一个绑定的不同视图
+- 当 `a.n` 变化时，`b.n` 会自动反映这个变化
+- 这种变化会继续传播到所有依赖 `b.n` 的地方
+
+#### 分析跨模块影响
+```typescript
+import { 
+  analyzeCrossModuleImpact, 
+  printCrossModuleLinks,
+  CrossModuleImpactAnalyzer 
+} from "./index";
+
+// 打印所有跨模块实时绑定
+printCrossModuleLinks("./src/index.ts");
+
+// 分析特定变量的跨模块影响
+const { found, result, liveBindingInfo } = analyzeCrossModuleImpact(
+  "./src/index.ts",
+  "n"  // 变量名，或 "./src/a.js::n" 格式
+);
+
+if (found) {
+  // 查看实时绑定信息
+  console.log("是导入的:", liveBindingInfo?.isImported);
+  console.log("是导出的:", liveBindingInfo?.isExported);
+  console.log("源模块:", liveBindingInfo?.sourceModule);
+  console.log("影响模块:", liveBindingInfo?.importedByModules);
+  
+  // 查看影响分析结果
+  console.log("直接影响:", result?.directImpacts.length);
+  console.log("跨模块影响:", result?.crossModuleImpacts.size);
+  console.log("影响链:", result?.impactChains);
+}
+
+// 使用底层 API
+const analyzer = new EntryAnalyzer();
+const { moduleGraph } = analyzer.analyze("./src/index.ts");
+
+// 链接模块（建立 import/export 关系）
+const linker = new ModuleLinker(moduleGraph);
+linker.link();
+
+// 创建跨模块影响分析器
+const impactAnalyzer = new CrossModuleImpactAnalyzer(moduleGraph);
+
+// 查找所有跨模块链接
+const links = impactAnalyzer.findAllCrossModuleLinks();
+for (const link of links) {
+  console.log(`${link.exportName}: ${link.sourceModule} -> ${link.targetModule}`);
+}
+
+// 获取实时绑定信息
+const binding = /* 获取某个 binding */;
+const info = impactAnalyzer.getLiveBindingInfo(binding);
+console.log("被导入到:", info.importedByModules);
+
+// 分析变化影响
+const impact = impactAnalyzer.analyze(binding);
+console.log("受影响的 binding:", impact.allImpactedBindings);
+```
+
+#### Binding 的跨模块属性
+```typescript
+interface Binding {
+  // ... 其他属性
+  
+  /** 导出源 binding（用于 import 的实时绑定） */
+  exportSource?: Binding;
+  
+  /** 被哪些 binding 导入（反向链接） */
+  importedBy: Binding[];
+  
+  /** 所在模块路径 */
+  moduleId?: string;
+}
+```
+
+### 5. Tree-shaking 分析
 
 #### 分析未使用代码
 ```typescript

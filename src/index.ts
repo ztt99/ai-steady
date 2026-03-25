@@ -5,12 +5,19 @@ import { DependencyGraphBuilder } from "./analyzer/graphDep";
 import { getAllTSFiles } from "./scanner/fileScanner";
 import { ProjectReport } from "./types/report";
 import { TreeShakingAnalyzer, TreeShakingResult } from "./analyzer/treeShakingAnalyzer";
+import { CrossModuleImpactAnalyzer, CrossModuleImpactResult } from "./analyzer/crossModuleImpactAnalyzer";
+import { ModuleLinker } from "./analyzer/passes/linking/moduleLinker";
+import { Binding } from "./analyzer/binding/Binding";
+
+export { Binding } from "./analyzer/binding/Binding";
 
 export { EntryAnalyzer } from "./analyzer/entryAnalyzer";
 export { VariableGraphBuilder, VariableGraph } from "./analyzer/variableGraphBuilder";
 export { ModuleGraph } from "./analyzer/graph/module/moduleGraph";
 export { DependencyGraphBuilder } from "./analyzer/graphDep";
 export { TreeShakingAnalyzer, TreeShakingResult } from "./analyzer/treeShakingAnalyzer";
+export { CrossModuleImpactAnalyzer, CrossModuleImpactResult } from "./analyzer/crossModuleImpactAnalyzer";
+export { ModuleLinker } from "./analyzer/passes/linking/moduleLinker";
 
 /**
  * 分析入口文件并生成变量图谱
@@ -157,6 +164,103 @@ export function analyzeImpact(entryFile: string, variableName: string) {
   findImpact(targetNode.id);
 
   return { found: true, impacted };
+}
+
+/**
+ * 分析跨模块影响
+ * 当 a.js 导出 n，b.js 导入 n 时，分析 a.n 变化对 b.n 的影响
+ * 
+ * @param entryFile 入口文件
+ * @param targetVariable 目标变量名（格式："模块路径::变量名" 或仅变量名）
+ * @returns 跨模块影响分析结果
+ */
+export function analyzeCrossModuleImpact(
+  entryFile: string,
+  targetVariable: string
+): {
+  found: boolean;
+  result?: CrossModuleImpactResult;
+  liveBindingInfo?: {
+    isImported: boolean;
+    isExported: boolean;
+    sourceBinding?: Binding;
+    sourceModule?: string;
+    importedBy: Binding[];
+    importedByModules: string[];
+  };
+} {
+  // 1. 分析入口
+  const analyzer = new EntryAnalyzer();
+  const { moduleGraph, contexts } = analyzer.analyze(entryFile);
+
+  // 2. 链接模块
+  const linker = new ModuleLinker(moduleGraph);
+  linker.link();
+
+  // 3. 查找目标 binding
+  let targetBinding: Binding | undefined;
+  
+  // 尝试解析 "模块路径::变量名" 格式
+  if (targetVariable.includes("::")) {
+    const [modulePath, varName] = targetVariable.split("::");
+    const module = moduleGraph.modules.get(modulePath);
+    if (module) {
+      for (const binding of module.bindings) {
+        if (binding.name === varName) {
+          targetBinding = binding;
+          break;
+        }
+      }
+    }
+  } else {
+    // 仅变量名，搜索所有模块
+    for (const [filePath, module] of moduleGraph.modules) {
+      for (const binding of module.bindings) {
+        if (binding.name === targetVariable) {
+          targetBinding = binding;
+          break;
+        }
+      }
+      if (targetBinding) break;
+    }
+  }
+
+  if (!targetBinding) {
+    return { found: false };
+  }
+
+  // 4. 创建影响分析器
+  const impactAnalyzer = new CrossModuleImpactAnalyzer(moduleGraph, contexts);
+
+  // 5. 分析影响
+  const result = impactAnalyzer.analyze(targetBinding, {
+    followCrossModule: true,
+    maxDepth: 10,
+  });
+
+  // 6. 获取实时绑定信息
+  const liveBindingInfo = impactAnalyzer.getLiveBindingInfo(targetBinding);
+
+  return {
+    found: true,
+    result,
+    liveBindingInfo,
+  };
+}
+
+/**
+ * 打印跨模块绑定报告
+ * @param entryFile 入口文件
+ */
+export function printCrossModuleLinks(entryFile: string): string {
+  const analyzer = new EntryAnalyzer();
+  const { moduleGraph, contexts } = analyzer.analyze(entryFile);
+
+  const linker = new ModuleLinker(moduleGraph);
+  linker.link();
+
+  const impactAnalyzer = new CrossModuleImpactAnalyzer(moduleGraph, contexts);
+  return impactAnalyzer.printCrossModuleLinks();
 }
 
 /**

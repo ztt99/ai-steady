@@ -13,6 +13,14 @@ export class ModuleLinker {
    * 链接所有模块的导入导出关系
    */
   link(): void {
+    // 第一步：设置所有 binding 的 moduleId
+    for (const [filePath, module] of this.moduleGraph.modules) {
+      for (const binding of module.bindings) {
+        binding.moduleId = filePath;
+      }
+    }
+
+    // 第二步：链接导入导出
     for (const [filePath, module] of this.moduleGraph.modules) {
       // 处理每个导入
       for (const [localName, importInfo] of module.imports) {
@@ -64,14 +72,14 @@ export class ModuleLinker {
     }
 
     if (exportBinding) {
-      // 建立链接关系
-      // 可以将导入 binding 的 shadowed 指向导出 binding
-      // 或者添加特殊的 importSource 属性
-      (importBinding as any).importSource = {
-        module: sourceModule,
-        binding: exportBinding,
-        name: importInfo.importedName,
-      };
+      // 建立实时绑定链接
+      // importBinding 是 exportBinding 的一个"视图"
+      importBinding.exportSource = exportBinding;
+      
+      // 反向链接：exportBinding 被 importBinding 导入
+      if (!exportBinding.importedBy.includes(importBinding)) {
+        exportBinding.importedBy.push(importBinding);
+      }
     }
   }
 
