@@ -4,11 +4,13 @@ import { ModuleGraph } from "./analyzer/graph/module/moduleGraph";
 import { DependencyGraphBuilder } from "./analyzer/graphDep";
 import { getAllTSFiles } from "./scanner/fileScanner";
 import { ProjectReport } from "./types/report";
+import { TreeShakingAnalyzer, TreeShakingResult } from "./analyzer/treeShakingAnalyzer";
 
 export { EntryAnalyzer } from "./analyzer/entryAnalyzer";
 export { VariableGraphBuilder, VariableGraph } from "./analyzer/variableGraphBuilder";
 export { ModuleGraph } from "./analyzer/graph/module/moduleGraph";
 export { DependencyGraphBuilder } from "./analyzer/graphDep";
+export { TreeShakingAnalyzer, TreeShakingResult } from "./analyzer/treeShakingAnalyzer";
 
 /**
  * 分析入口文件并生成变量图谱
@@ -155,4 +157,53 @@ export function analyzeImpact(entryFile: string, variableName: string) {
   findImpact(targetNode.id);
 
   return { found: true, impacted };
+}
+
+/**
+ * 分析 tree-shaking，识别未使用的代码
+ * @param entryFiles 入口文件列表
+ * @param rootDir 项目根目录（可选，用于分析整个项目）
+ * @param options tree-shaking 配置
+ * @returns Tree-shaking 分析结果
+ */
+export function analyzeTreeShaking(
+  entryFiles: string[],
+  options: {
+    rootDir?: string;
+    sideEffects?: (string | RegExp)[];
+  } = {}
+): TreeShakingResult {
+  const moduleGraph = new ModuleGraph();
+  const contexts = new Map();
+
+  // 分析所有文件或从入口开始
+  if (options.rootDir) {
+    const files = getAllTSFiles(options.rootDir);
+    const { analyzeFile } = require("./analyzer/core/analyzer");
+    for (const file of files) {
+      const ctx = analyzeFile(file, moduleGraph);
+      contexts.set(file, ctx);
+    }
+  } else {
+    // 从入口递归分析
+    const analyzer = new EntryAnalyzer();
+    const result = analyzer.analyze(entryFiles[0]);
+    contexts.set(entryFiles[0], result.contexts.get(entryFiles[0]));
+  }
+
+  // 执行 tree-shaking 分析
+  const treeShaker = new TreeShakingAnalyzer(moduleGraph, contexts);
+  return treeShaker.analyze(entryFiles, {
+    sideEffects: options.sideEffects,
+  });
+}
+
+/**
+ * 生成 tree-shaking 报告
+ * @param result TreeShakingResult
+ * @returns 格式化的报告字符串
+ */
+export function generateTreeShakingReport(result: TreeShakingResult): string {
+  const analyzer = new TreeShakingAnalyzer(new ModuleGraph(), new Map());
+  return analyzer.generateReport(result);
 }
