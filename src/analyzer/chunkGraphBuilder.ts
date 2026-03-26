@@ -313,14 +313,22 @@ export class ChunkGraphBuilder {
 
     this.chunks.set(chunkId, chunk);
 
-    // 添加依赖边
-    for (const entryChunkId of this.entryChunks) {
+    // 添加依赖边：所有引用了 vendor 模块的 chunk 都应该依赖 vendors chunk
+    const parentChunkIds = new Set<string>();
+    for (const [filePath, module] of vendorModules) {
+      const oldChunkId = this.moduleToChunk.get(filePath);
+      if (oldChunkId && oldChunkId !== chunkId) {
+        parentChunkIds.add(oldChunkId);
+      }
+    }
+
+    for (const parentChunkId of parentChunkIds) {
       this.edges.push({
-        from: entryChunkId,
+        from: parentChunkId,
         to: chunkId,
         type: "static",
       });
-      chunk.parents.add(entryChunkId);
+      chunk.parents.add(parentChunkId);
     }
   }
 
