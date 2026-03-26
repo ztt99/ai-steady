@@ -9,9 +9,11 @@ import { CrossModuleImpactAnalyzer, CrossModuleImpactResult } from "./analyzer/c
 import { ModuleLinker } from "./analyzer/passes/linking/moduleLinker";
 import { Binding } from "./analyzer/binding/Binding";
 import { ChunkGraphBuilder, ChunkGraph, ChunkGraphOptions } from "./analyzer/chunkGraphBuilder";
+import { generateChunkBundle, generateAllBundles, BundleOptions, BundleResult } from "./analyzer/generateBundle/generateChunk";
 
 export { Binding } from "./analyzer/binding/Binding";
 export { ChunkGraphBuilder, ChunkGraph, ChunkGraphOptions } from "./analyzer/chunkGraphBuilder";
+export { generateChunkBundle, generateAllBundles, BundleOptions, BundleResult } from "./analyzer/generateBundle/generateChunk";
 
 export { EntryAnalyzer } from "./analyzer/entryAnalyzer";
 export { VariableGraphBuilder, VariableGraph } from "./analyzer/variableGraphBuilder";

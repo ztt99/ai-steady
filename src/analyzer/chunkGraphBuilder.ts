@@ -1,7 +1,7 @@
 import { Binding } from "./binding/Binding";
 import { ModuleGraph } from "./graph/module/moduleGraph";
 import { Module } from "./graph/module/module";
-
+import fs from "fs";
 /**
  * Chunk 类型
  */
@@ -19,6 +19,7 @@ export interface ChunkModule {
   imports: Map<string, string>; // localName -> sourceModule
   /** 是否是异步导入 */
   isAsyncImport: boolean;
+  code: string;
 }
 
 /**
@@ -302,10 +303,9 @@ export class ChunkGraphBuilder {
       chunk.modules.set(filePath, {
         path: filePath,
         exports: Array.from(module.exports.values()),
-        imports: new Map(
-          Array.from(module.imports.entries()).map(([k, v]) => [k, v.source])
-        ),
+        imports: new Map(Array.from(module.imports.entries()).map(([k, v]) => [k, v.source])),
         isAsyncImport: false,
+        code: fs.readFileSync(filePath, "utf-8"),
       });
 
       this.moduleToChunk.set(filePath, chunkId);
@@ -378,10 +378,9 @@ export class ChunkGraphBuilder {
         chunk.modules.set(filePath, {
           path: filePath,
           exports: Array.from(module.exports.values()),
-          imports: new Map(
-            Array.from(module.imports.entries()).map(([k, v]) => [k, v.source])
-          ),
+          imports: new Map(Array.from(module.imports.entries()).map(([k, v]) => [k, v.source])),
           isAsyncImport: false,
+          code: fs.readFileSync(filePath, "utf-8"),
         });
 
         this.moduleToChunk.set(filePath, chunkId);
@@ -404,7 +403,6 @@ export class ChunkGraphBuilder {
       }
     }
   }
-
 
   /**
    * Apply cache group
@@ -477,10 +475,9 @@ export class ChunkGraphBuilder {
       chunk.modules.set(filePath, {
         path: filePath,
         exports: Array.from(module.exports.values()),
-        imports: new Map(
-          Array.from(module.imports.entries()).map(([k, v]) => [k, v.source])
-        ),
+        imports: new Map(Array.from(module.imports.entries()).map(([k, v]) => [k, v.source])),
         isAsyncImport: false,
+        code: fs.readFileSync(filePath, "utf-8"),
       });
 
       this.moduleToChunk.set(filePath, chunkId);
@@ -506,9 +503,7 @@ export class ChunkGraphBuilder {
         if (!targetChunkId || targetChunkId === sourceChunkId) continue;
 
         // 检查是否已存在边
-        const exists = this.edges.some(
-          (e) => e.from === sourceChunkId && e.to === targetChunkId
-        );
+        const exists = this.edges.some((e) => e.from === sourceChunkId && e.to === targetChunkId);
 
         if (!exists) {
           const isDynamic = this.isDynamicImport(filePath, importInfo.source);
@@ -574,10 +569,9 @@ export class ChunkGraphBuilder {
         chunk.modules.set(filePath, {
           path: filePath,
           exports: Array.from(module.exports.values()),
-          imports: new Map(
-            Array.from(module.imports.entries()).map(([k, v]) => [k, v.source])
-          ),
+          imports: new Map(Array.from(module.imports.entries()).map(([k, v]) => [k, v.source])),
           isAsyncImport: false,
+          code: fs.readFileSync(filePath, "utf-8"),
         });
 
         this.moduleToChunk.set(filePath, chunk.id);
@@ -619,10 +613,7 @@ export class ChunkGraphBuilder {
   /**
    * 解析模块路径
    */
-  private resolveModulePath(
-    importPath: string,
-    fromFile: string
-  ): string | null {
+  private resolveModulePath(importPath: string, fromFile: string): string | null {
     if (!importPath.startsWith(".") && !importPath.startsWith("/")) {
       return null;
     }
@@ -674,9 +665,7 @@ export class ChunkGraphBuilder {
     }
 
     // Async Chunks
-    const asyncChunks = Array.from(graph.chunks.values()).filter(
-      (c) => c.type === "async"
-    );
+    const asyncChunks = Array.from(graph.chunks.values()).filter((c) => c.type === "async");
     if (asyncChunks.length > 0) {
       lines.push("\n⚡ Async Chunks (代码分割):");
       for (const chunk of asyncChunks) {
@@ -688,7 +677,7 @@ export class ChunkGraphBuilder {
 
     // Vendor/Common Chunks
     const vendorChunks = Array.from(graph.chunks.values()).filter(
-      (c) => c.type === "vendor" || c.type === "common"
+      (c) => c.type === "vendor" || c.type === "common",
     );
     if (vendorChunks.length > 0) {
       lines.push("\n📦 Vendor/Common Chunks:");
@@ -708,9 +697,7 @@ export class ChunkGraphBuilder {
 
     // 优化建议
     lines.push("\n💡 优化建议:");
-    const largeChunks = Array.from(graph.chunks.values()).filter(
-      (c) => c.size > 244 * 1024
-    ); // > 244KB
+    const largeChunks = Array.from(graph.chunks.values()).filter((c) => c.size > 244 * 1024); // > 244KB
     if (largeChunks.length > 0) {
       lines.push(`  发现 ${largeChunks.length} 个超大 chunk (>244KB):`);
       for (const chunk of largeChunks) {

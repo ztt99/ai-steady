@@ -7,13 +7,93 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "CLI: ts-node (Node20) src/cli.ts ./src/note",
-      "runtimeExecutable": "/Users/zhangting/.nvm/versions/node/v20.19.3/bin/node",
-      "program": "${workspaceFolder}/node_modules/ts-node/dist/bin.js",
+      "name": "Debug: CLI (src/cli.ts)",
+      "runtimeExecutable": "ts-node",
       "args": ["${workspaceFolder}/src/cli.ts", "./src/note"],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
-      "skipFiles": ["<node_internals>/**"]
+      "skipFiles": ["<node_internals>/**"],
+      "env": {
+        "TS_NODE_TRANSPILE_ONLY": "true"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: Current File (ts-node)",
+      "runtimeExecutable": "ts-node",
+      "args": ["${relativeFile}"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "env": {
+        "TS_NODE_TRANSPILE_ONLY": "true"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: Generate Bundle Example",
+      "runtimeExecutable": "ts-node",
+      "args": ["${workspaceFolder}/examples/generate-bundle-simple.ts"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "env": {
+        "TS_NODE_TRANSPILE_ONLY": "true"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: Entry Analyzer Example",
+      "runtimeExecutable": "ts-node",
+      "args": ["${workspaceFolder}/examples/analyze-entry.ts", "./src/index.ts"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "env": {
+        "TS_NODE_TRANSPILE_ONLY": "true"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: Chunk Graph Example",
+      "runtimeExecutable": "ts-node",
+      "args": ["${workspaceFolder}/examples/chunk-graph.ts", "./src/index.ts"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "env": {
+        "TS_NODE_TRANSPILE_ONLY": "true"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: Tree Shaking Example",
+      "runtimeExecutable": "ts-node",
+      "args": ["${workspaceFolder}/examples/tree-shaking.ts", "./src/index.ts"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "env": {
+        "TS_NODE_TRANSPILE_ONLY": "true"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug: Cross Module Impact Example",
+      "runtimeExecutable": "ts-node",
+      "args": ["${workspaceFolder}/examples/cross-module-impact.ts", "./src/index.ts"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "env": {
+        "TS_NODE_TRANSPILE_ONLY": "true"
+      }
     }
   ]
 }
