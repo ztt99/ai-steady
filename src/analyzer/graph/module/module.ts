@@ -20,6 +20,7 @@ export type ImportBinding = {
 export class Module {
   id: string;
 
+  code: string | null = null;
   /** 导入映射: 本地名称 -> 源模块 */
   imports = new Map<string, ImportBinding>();
 

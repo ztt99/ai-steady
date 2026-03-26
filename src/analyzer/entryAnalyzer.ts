@@ -14,10 +14,12 @@ export class EntryAnalyzer {
   private moduleGraph = new ModuleGraph();
   private contexts = new Map<string, AnalyzerContext>();
 
-  constructor(private options: {
-    baseDir?: string;
-    resolvePath?: (importPath: string, fromFile: string) => string;
-  } = {}) {}
+  constructor(
+    private options: {
+      baseDir?: string;
+      resolvePath?: (importPath: string, fromFile: string) => string;
+    } = {},
+  ) {}
 
   /**
    * 从入口文件开始分析
@@ -30,7 +32,7 @@ export class EntryAnalyzer {
 
     // 标准化入口路径
     const absoluteEntry = path.resolve(entryFile);
-    
+
     // 递归分析所有依赖
     this.analyzeRecursive(absoluteEntry);
 
@@ -52,6 +54,7 @@ export class EntryAnalyzer {
     }
 
     this.visited.add(filePath);
+    this.moduleGraph.ensureModule(filePath).code = fs.readFileSync(filePath, "utf-8");
 
     // 分析当前文件
     const ctx = analyzeFile(filePath, this.moduleGraph);
@@ -89,7 +92,7 @@ export class EntryAnalyzer {
 
     // 尝试添加扩展名
     const extensions = [".ts", ".tsx", ".js", ".jsx", "/index.ts", "/index.tsx"];
-    
+
     for (const ext of extensions) {
       const fullPath = resolved + ext;
       if (fs.existsSync(fullPath)) {

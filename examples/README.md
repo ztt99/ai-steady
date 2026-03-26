@@ -212,34 +212,154 @@ interface TreeShakingResult {
 }
 ```
 
-### 5. 底层 API（更灵活）
+### 5. Chunk Graph 分析（代码分割）
+
+分析代码分割、异步加载、chunk 依赖关系。
+
+```typescript
+import { 
+  analyzeChunkGraph, 
+  generateChunkGraphReport,
+  ChunkGraphBuilder 
+} from "./index";
+
+// 分析 Chunk Graph
+const chunkGraph = analyzeChunkGraph(
+  { main: "./src/index.ts" },
+  moduleGraph
+);
+
+// 查看 chunks
+for (const [chunkId, chunk] of chunkGraph.chunks) {
+  console.log(`${chunk.name} (${chunk.type}):`);
+  console.log(`  模块数: ${chunk.modules.size}`);
+  console.log(`  大小: ${chunk.size} bytes`);
+  console.log(`  父 chunks: ${Array.from(chunk.parents)}`);
+  console.log(`  异步依赖: ${Array.from(chunk.asyncDeps)}`);
+}
+
+// 查看 chunk 依赖
+for (const edge of chunkGraph.edges) {
+  console.log(`${edge.from} ${edge.type === "dynamic" ? "~>" : "->"} ${edge.to}`);
+}
+
+// 生成报告
+const report = generateChunkGraphReport(chunkGraph);
+console.log(report);
+
+// 使用底层 API 自定义配置
+const builder = new ChunkGraphBuilder(moduleGraph, {
+  entries: { main: "./src/index.ts", admin: "./src/admin.ts" },
+  splitChunks: {
+    minSize: 30000,        // 30KB
+    minChunks: 2,          // 至少被 2 个 chunk 引用
+    maxAsyncRequests: 5,   // 最大异步请求数
+    vendors: /node_modules/, // 提取 vendors
+    cacheGroups: [
+      {
+        name: "shared",
+        test: /shared/,      // 匹配 shared 目录下的模块
+        priority: 10,
+      },
+      {
+        name: "all-common",  // 不写 test，默认匹配所有模块
+        minChunks: 3,        // 被至少 3 个 chunk 引用
+        priority: 5,
+      },
+    ],
+  },
+});
+
+const graph = builder.build();
+```
+
+#### 缓存组 (cacheGroups) 说明
+
+**test 属性（可选）**
+- 用于匹配哪些模块应该被分到该缓存组
+- 如果不填，默认匹配**所有模块**（相当于 `test: /.*/`）
+- 通常配合 `minChunks` 使用，提取被多次引用的公共模块
+
+```typescript
+cacheGroups: [
+  // 1. 匹配特定目录
+  {
+    name: "shared",
+    test: /shared/,        // 只匹配路径中包含 "shared" 的模块
+    priority: 10,
+  },
+  // 2. 匹配 vendors
+  {
+    name: "vendors",
+    test: /node_modules/,  // 只匹配 node_modules 中的模块
+    priority: 20,
+  },
+  // 3. 不写 test - 匹配所有模块
+  {
+    name: "common",
+    // test 不填，默认匹配所有模块
+    minChunks: 2,          // 被至少 2 个 chunk 引用才会提取
+    priority: 5,
+  },
+]
+```
+
+**优先级 (priority)**
+- 数值越大，优先级越高
+- 一个模块可能匹配多个缓存组，会被分到优先级最高的组
+
+#### Chunk Graph 结构
+```typescript
+interface ChunkGraph {
+  chunks: Map<string, Chunk>;
+  edges: ChunkEdge[];
+  entryChunks: Set<string>;
+  moduleToChunk: Map<string, string>;
+}
+
+interface Chunk {
+  id: string;
+  name: string;
+  type: "entry" | "async" | "common" | "vendor";
+  modules: Map<string, ChunkModule>;
+  size: number;
+  parents: Set<string>;     // 父 chunks
+  children: Set<string>;    // 子 chunks
+  asyncDeps: Set<string>;   // 异步依赖
+}
+```
+
+### 6. 底层 API（更灵活）
 
 ```typescript
 import { 
   EntryAnalyzer, 
   VariableGraphBuilder,
-  TreeShakingAnalyzer 
+  TreeShakingAnalyzer,
+  ChunkGraphBuilder,
+  CrossModuleImpactAnalyzer,
+  ModuleLinker
 } from "./index";
 
 // 分析入口
 const analyzer = new EntryAnalyzer();
 const { moduleGraph, contexts } = analyzer.analyze("./src/index.ts");
 
-// 构建图谱
+// 链接模块（建立 import/export 关系）
+const linker = new ModuleLinker(moduleGraph);
+linker.link();
+
+// 构建变量图谱
 const graphBuilder = new VariableGraphBuilder(moduleGraph, contexts);
 const graph = graphBuilder.build();
 
-// 获取依赖子图
-const subGraph = graphBuilder.getDependencySubgraph("./src/index.ts", 2);
+// 跨模块影响分析
+const impactAnalyzer = new CrossModuleImpactAnalyzer(moduleGraph, contexts);
+const impact = impactAnalyzer.analyze(binding);
 
-// 获取调用链
-const chain = graphBuilder.getCallChain(binding, filePath);
-
-// 获取影响范围
-const impacted = graphBuilder.getImpactedVariables(binding, filePath);
-
-// 导出为 DOT 格式
-const dot = graphBuilder.toDotFormat(graph);
+// Chunk Graph 分析
+const chunkBuilder = new ChunkGraphBuilder(moduleGraph, { entries });
+const chunkGraph = chunkBuilder.build();
 
 // Tree-shaking 分析
 const treeShaker = new TreeShakingAnalyzer(moduleGraph, contexts);
@@ -290,6 +410,14 @@ npx ts-node examples/tree-shaking.ts ./src/index.ts
 
 # 分析整个项目
 npx ts-node examples/tree-shaking.ts ./src/index.ts --project ./src
+```
+
+### Chunk Graph 分析
+```bash
+# 分析代码分割
+npx ts-node examples/chunk-graph.ts ./src/index.ts
+
+# 输出包含 chunk 依赖图、代码分割建议、可视化 DOT 文件
 ```
 
 ## 可视化

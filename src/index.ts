@@ -8,8 +8,10 @@ import { TreeShakingAnalyzer, TreeShakingResult } from "./analyzer/treeShakingAn
 import { CrossModuleImpactAnalyzer, CrossModuleImpactResult } from "./analyzer/crossModuleImpactAnalyzer";
 import { ModuleLinker } from "./analyzer/passes/linking/moduleLinker";
 import { Binding } from "./analyzer/binding/Binding";
+import { ChunkGraphBuilder, ChunkGraph, ChunkGraphOptions } from "./analyzer/chunkGraphBuilder";
 
 export { Binding } from "./analyzer/binding/Binding";
+export { ChunkGraphBuilder, ChunkGraph, ChunkGraphOptions } from "./analyzer/chunkGraphBuilder";
 
 export { EntryAnalyzer } from "./analyzer/entryAnalyzer";
 export { VariableGraphBuilder, VariableGraph } from "./analyzer/variableGraphBuilder";
@@ -261,6 +263,44 @@ export function printCrossModuleLinks(entryFile: string): string {
 
   const impactAnalyzer = new CrossModuleImpactAnalyzer(moduleGraph, contexts);
   return impactAnalyzer.printCrossModuleLinks();
+}
+
+/**
+ * 分析 Chunk Graph，生成代码分割建议
+ * @param entries 入口配置 { name: path }
+ * @param moduleGraph ModuleGraph 实例
+ * @returns Chunk Graph 分析结果
+ */
+export function analyzeChunkGraph(
+  entries: Record<string, string>,
+  moduleGraph: ModuleGraph
+): ChunkGraph {
+  const builder = new ChunkGraphBuilder(moduleGraph, {
+    entries,
+    splitChunks: {
+      minChunks: 2,
+      vendors: /node_modules/,
+      cacheGroups: [
+        {
+          name: "shared",
+          test: /shared/,
+          priority: 10,
+        },
+      ],
+    },
+  });
+
+  return builder.build();
+}
+
+/**
+ * 生成 Chunk Graph 报告
+ * @param graph ChunkGraph
+ * @returns 格式化的报告字符串
+ */
+export function generateChunkGraphReport(graph: ChunkGraph): string {
+  const builder = new ChunkGraphBuilder(new ModuleGraph(), { entries: {} });
+  return builder.generateReport(graph);
 }
 
 /**
